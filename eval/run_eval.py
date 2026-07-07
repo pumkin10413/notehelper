@@ -49,7 +49,9 @@ def run_case(path):
     if not out.strip():
         failures.append("A1 empty output")
     allowed = numbers_in(case["bullets"]) | numbers_in(template)
-    invented = numbers_in(out) - allowed
+    # List-item numerals ("1.", "2)") at line start are enumeration, not clinical facts.
+    out_for_numbers = re.sub(r"(?m)^\s*\d+[.)]\s", "", out)
+    invented = numbers_in(out_for_numbers) - allowed
     if invented:
         failures.append("A2 invented numbers: %s" % sorted(invented))
     if re.match(r"^\s*(here|sure|below|certainly|```)", out, re.IGNORECASE):
