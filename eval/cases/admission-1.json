@@ -1,0 +1,6 @@
+{
+  "type": "admission",
+  "bullets": "65M, DM type 2 and HTN for 10 years\nfever and productive cough with yellow sputum for 3 days\nno chest pain, no hemoptysis\nsmoker 1 pack per day for 30 years, no alcohol, no betel nut\nno drug allergy\nBP 135/82, HR 96, RR 20, BT 38.5, SpO2 94% on room air\ncoarse crackles right upper lung field\nCXR: right upper lobe consolidation\nWBC 14200, CRP 8.5\nimp: community acquired pneumonia, right upper lobe\nplan: admit, sputum culture, blood culture x2, ceftriaxone plus azithromycin, follow CXR",
+  "must_contain": ["Chief Complaint", "Present Illness", "Impression", "Plan", "NKDA", "94", "community", "ceftriaxone"],
+  "must_not_contain": ["Here is", "```", "[age]"]
+}

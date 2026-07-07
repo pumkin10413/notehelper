@@ -1,0 +1,6 @@
+{
+  "type": "procedure",
+  "bullets": "thoracentesis right side today\nindication: right pleural effusion, dyspnea\nunder sono guidance, local lidocaine 2%\npatient sitting, sterile prep and drape\n18G needle, right 7th intercostal space posterior axillary line\ndrained 800 ml yellowish clear fluid\nsent for cell count, biochemistry, culture, cytology\nno immediate complication, patient tolerated well\nplan: follow up CXR, monitor vitals",
+  "must_contain": ["Procedure", "Indication", "800", "cytology", "No immediate complication", "CXR"],
+  "must_not_contain": ["Here is", "```"]
+}

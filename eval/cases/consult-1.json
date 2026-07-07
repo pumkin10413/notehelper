@@ -1,0 +1,6 @@
+{
+  "type": "consult",
+  "bullets": "cardiology consult reply\n70F admitted for hip fracture, pre-op cardiac evaluation requested\nhistory of HTN on amlodipine, no known CAD\ndenies chest pain or dyspnea, good functional capacity before fracture\nECG: sinus rhythm, no ST-T change\necho last year: LVEF 60%\nassessment: low cardiac risk for intermediate risk surgery\nrecommend: proceed with surgery, continue amlodipine, avoid hypotension, no further cardiac testing needed",
+  "must_contain": ["Thank you", "Reason for consultation", "Recommendations", "amlodipine", "60"],
+  "must_not_contain": ["Here is", "```"]
+}

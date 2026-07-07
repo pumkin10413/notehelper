@@ -1,0 +1,6 @@
+# Large model binaries — re-download per docs/SETUP.md
+models/*.bin
+# Editor/OS noise
+.DS_Store
+# Scratch
+*.tmp

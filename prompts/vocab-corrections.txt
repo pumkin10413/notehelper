@@ -1,0 +1,15 @@
+# Post-STT medical vocabulary corrections. Format: wrong => right (case-insensitive match).
+# Add a line whenever whisper mis-hears a term you use often. Keep alphabetical.
+# NEVER add a correction that turns one valid drug into another unless the wrong form
+# is not a real drug name.
+a fib => AF
+afib => AF
+c b c => CBC
+c t => CT
+c x r => CXR
+e k g => ECG
+lasix => furosemide (Lasix)
+metaprolol => metoprolol
+n p o => NPO
+p r n => PRN
+tylenol => acetaminophen

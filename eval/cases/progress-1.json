@@ -1,0 +1,6 @@
+{
+  "type": "progress",
+  "bullets": "post op day 2 lap appendectomy\nno fever overnight, pain controlled, passed flatus\nBP 118/72, HR 78, BT 36.8\nwound clean and dry, abdomen soft\nplan: resume soft diet, keep oral analgesics, discharge tomorrow if stable",
+  "must_contain": ["S:", "O:", "A:", "P:", "118/72", "36.8", "soft diet"],
+  "must_not_contain": ["Here is", "```", "SpO2"]
+}
