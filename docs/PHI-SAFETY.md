@@ -36,6 +36,28 @@ save — show the user what needs replacing and wait for a cleaned version.
   Check: `git -C <repo> remote -v` should print nothing.
 - Model downloads (whisper/ollama) are inbound public files — allowed.
 
+## External / cloud AI models (Gemini, ChatGPT, Copilot, Claude cloud, etc.)
+"Local" means the model runs on THIS Mac: Ollama, whisper.cpp, or Chrome's on-device
+Gemini Nano. Everything else is cloud — even if you open it in a browser tab on this machine.
+
+- **Cloud models may NEVER see chart content** — no bullets, no transcripts, no generated
+  charts, no real samples. Pasting patient data into gemini.google.com, the Gemini API, the
+  "Gemini in Chrome" assistant, Gemini Advanced, ChatGPT, or Copilot is a PHI breach,
+  identical to emailing it out.
+- **Cloud models MAY build and maintain the system** — anything with no patient data in it:
+  edit templates/prompts/scripts/docs, write new generic chart skeletons and eval cases,
+  review architecture, refactor code, explain errors, suggest vetted local-model swaps.
+- **Orchestration caveat:** if a cloud model (e.g. a Gemini/Chrome agent) is *driving* the
+  pipeline, the patient bullets must not pass through its context. Route live patient data
+  straight to the local model — the user runs `app/server.py` or `scripts/chart.py`
+  themselves. A cloud agent that reads the bullets to "help format" them has already leaked them.
+- **On-device exception — Gemini Nano in Chrome:** Chrome's built-in Prompt API
+  (`window.ai` / on-device Gemini Nano) runs locally, so it is PHI-safe like Ollama. It
+  *could* do the bullets→chart step, but it is a Nano-tier model with a small context window
+  and weaker instruction-following than qwen2.5:7b — expect worse format fidelity. Treat it
+  as an experimental fallback only, and pass `eval/run_eval.py` before trusting it. It does
+  not replace the default pipeline.
+
 ## What the user must still do themselves
 - Proofread every generated chart before it enters the medical record. The app shows this
   warning permanently; never remove it.
