@@ -19,7 +19,8 @@ Voice → text via whisper.cpp; bullets → formatted chart via Ollama. **No pat
 | Chart templates | [templates/](templates/README.md) |
 | LLM prompts (bullets→chart) | [prompts/](prompts/README.md) |
 | CLI tools | [scripts/](docs/ARCHITECTURE.md) — `chart.py`, `dictate.sh`, `voice-chart.sh`, `doctor.sh` |
-| Web app | `app/server.py` → http://127.0.0.1:8765 |
+| Web app (default, Ollama-backed) | `app/server.py` → http://127.0.0.1:8765 |
+| Browser-only fallback (on-device Gemini Nano, no server) | `app/chart-nano.html` — see [docs/NANO.md](docs/NANO.md) |
 | Regression tests for prompts | [eval/](eval/README.md) |
 | De-identified real samples | `samples/` (user adds; follow PHI-SAFETY checklist) |
 | Instructions for non-Claude agents | [AGENTS.md](AGENTS.md) |

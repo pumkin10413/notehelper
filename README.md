@@ -14,6 +14,11 @@ Open **http://127.0.0.1:8765** → type bullets or hit 🎙 Dictate → pick cha
 Tip: make it one word — add to `~/.zshrc`:
 `alias chartapp='cd ~/Documents/Code/medicalchart && python3 app/server.py'`
 
+## Browser-only option (no terminal, on-device Gemini Nano)
+Double-click `app/chart-nano.html` (or serve it: `python3 -m http.server 8766 --directory app`
+→ http://127.0.0.1:8766/chart-nano.html). Runs the bullets→chart step entirely in Chrome, no
+server. Lower quality than the Ollama app above — proofread harder. Details: [docs/NANO.md](docs/NANO.md).
+
 ## Terminal one-liners
 ```bash
 python3 scripts/chart.py --type admission --bullets "65M, DM/HTN, fever 3d, ..."

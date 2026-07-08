@@ -45,6 +45,28 @@ Next session should: <one concrete goal>
 
 ---
 
+## 2026-07-08 — Claude (Opus 4.8) — Add on-device Gemini Nano browser fallback
+Done:
+- Documented the cloud-vs-local boundary for external models in docs/PHI-SAFETY.md
+  ("External / cloud AI models" section) — Gemini/ChatGPT/etc. may build the system but never
+  see patient data; only on-device Nano is PHI-safe for chart content.
+- Built `app/chart-nano.html`: single self-contained file, bullets+labs → chart entirely on
+  Chrome's on-device Gemini Nano (Prompt API), no server/network/CDN. Templates embedded
+  (snapshot of templates/*.md) + a user "custom…" template slot (localStorage). Defensive
+  across Chrome API versions; fresh session per chart (no cross-patient context); NO browser
+  speech input (that would be cloud/PHI). Docs in docs/NANO.md; router + README updated;
+  `nano-static` added to .claude/launch.json for http serving.
+Not done / broken:
+- End-to-end Nano inference not run (needs one-time ~2 GB model download on the user's Chrome).
+  Everything up to the model call is verified (load, graceful degradation, API-drift handling,
+  exact prompt assembly, custom-template guard).
+- This is a FALLBACK. Default remains app/server.py + Ollama qwen2.5:7b (higher quality).
+Eval: run_eval.py unchanged and not re-run (no change to prompts/ or templates/ source; the
+Nano file has its own embedded snapshot). Still 4/4 from 2026-07-07.
+Next session should: Roadmap item 2 — rebuild admission + procedure templates from the user's
+real de-identified samples (`/add-template`). When you do, also re-copy them into the embedded
+snapshot in app/chart-nano.html (see docs/NANO.md "Maintaining it").
+
 ## 2026-07-07 — Claude Fable 5 — Bootstrap the entire system
 Done:
 - Installed ollama + whisper-cpp + ffmpeg (Homebrew); whisper model `models/ggml-small.en.bin`;

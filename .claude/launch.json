@@ -6,6 +6,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["app/server.py"],
       "port": 8765
+    },
+    {
+      "name": "nano-static",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8766", "--directory", "app"],
+      "port": 8766
     }
   ]
 }

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chart Assistant — Gemini Nano (on-device)</title>
+<!--
+  SELF-CONTAINED, 100% ON-DEVICE charting page.
+  - Runs the bullets+labs -> paragraph chart step entirely in Chrome using the built-in
+    on-device Gemini Nano (Prompt API). No server, no network calls, no external scripts.
+    The only thing Chrome may fetch is the Nano model binary itself (one-time, from Google) —
+    that is the model, never your data. See docs/PHI-SAFETY.md ("On-device exception").
+  - This is the EXPERIMENTAL FALLBACK described in docs/ARCHITECTURE.md. The default, higher
+    quality pipeline is app/server.py + Ollama qwen2.5:7b. Use this only when you want a
+    zero-terminal, browser-only path, and PROOFREAD harder — Nano is a small model.
+  - Deliberately NO speech input here: Chrome's webkitSpeechRecognition sends audio to Google
+    (cloud) and would be a PHI breach. Voice stays in the local whisper pipeline (scripts/).
+  - Templates below are a SNAPSHOT of templates/*.md. If you change those files, re-copy them
+    into the TEMPLATES object here (search "TEMPLATE SNAPSHOT"). Behavior matches chart.py:
+    the whole template text is handed to the model as the TEMPLATE block.
+-->
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1a1d21; --accent:#7c3aed; --border:#d7dbe0; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 -apple-system,"Helvetica Neue",sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:14px 20px; background:var(--card); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  header h1 { font-size:17px; margin:0; }
+  .badge { font-size:12px; color:#5b21b6; border:1px solid #7c3aed; border-radius:10px; padding:1px 8px; }
+  main { display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:16px 20px; max-width:1200px; margin:0 auto; }
+  @media (max-width:820px){ main { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:10px; }
+  label { font-weight:600; font-size:13px; }
+  select, textarea { width:100%; font:inherit; border:1px solid var(--border); border-radius:8px; padding:8px; }
+  textarea { min-height:240px; resize:vertical; }
+  #customTmpl { min-height:150px; font-family:ui-monospace,Menlo,monospace; font-size:12px; }
+  #chartOut { min-height:340px; white-space:pre-wrap; font-family:ui-monospace,Menlo,monospace; font-size:13px; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  button { font:inherit; font-weight:600; border:0; border-radius:8px; padding:9px 16px; cursor:pointer; background:var(--accent); color:#fff; }
+  button.secondary { background:#e7eaee; color:var(--ink); }
+  button:disabled { opacity:.5; cursor:default; }
+  #status { font-size:13px; color:#555; min-height:1.2em; }
+  .warn { font-size:12px; color:#8a5a00; background:#fff7e0; border:1px solid #eedc9a; border-radius:8px; padding:6px 10px; }
+  details { font-size:13px; background:#fff; border:1px solid var(--border); border-radius:8px; padding:8px 12px; }
+  details summary { cursor:pointer; font-weight:600; }
+  details code { background:#f0f0f4; padding:1px 4px; border-radius:4px; }
+  details li { margin:4px 0; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Chart Assistant</h1>
+  <span class="badge">On-device Gemini Nano — nothing leaves this Mac</span>
+  <span id="status">Checking for Gemini Nano…</span>
+</header>
+
+<main>
+  <section class="card">
+    <div class="row">
+      <label for="tmpl">Chart type</label>
+      <select id="tmpl"></select>
+    </div>
+    <div id="customWrap" class="hidden">
+      <label for="customTmpl">Custom template (saved in this browser)</label>
+      <textarea id="customTmpl" placeholder="Paste a template in the 3-part format from templates/README.md:
+NAME / STYLE header
+---
+skeleton with [bracketed slots]
+---
+RULES:
+- no invented values ..."></textarea>
+    </div>
+    <label for="bullets">Bullets / lab data</label>
+    <textarea id="bullets" placeholder="65M, DM type 2 / HTN
+fever and productive cough 3 days
+RUL crackles, SpO2 94% RA
+CXR: RUL consolidation
+WBC 14.2, CRP 8.5
+imp: CAP
+plan: admit, blood culture x2, ceftriaxone + azithromycin"></textarea>
+    <div class="row">
+      <button id="genBtn" type="button" disabled>Generate chart</button>
+      <button id="clearBtn" class="secondary" type="button">Clear</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="row" style="justify-content:space-between">
+      <label for="chartOut">Generated chart</label>
+      <button id="copyBtn" class="secondary" type="button">Copy</button>
+    </div>
+    <textarea id="chartOut" spellcheck="false"></textarea>
+    <div class="warn">AI-drafted by a small on-device model. <b>Read every line before pasting into the medical record</b> — you are the author of the chart.</div>
+    <details id="help">
+      <summary>Gemini Nano not available? Enable it</summary>
+      <ol>
+        <li>Use <b>Chrome 138+</b> (check <code>chrome://version</code>). Regular Chrome, on this Mac.</li>
+        <li>Enable flags, set each to <b>Enabled</b>, then relaunch:
+          <ul>
+            <li><code>chrome://flags/#prompt-api-for-gemini-nano</code></li>
+            <li><code>chrome://flags/#optimization-guide-on-device-model</code> → <b>Enabled BypassPerfRequirement</b></li>
+          </ul>
+        </li>
+        <li>Open <code>chrome://on-device-internals</code> (or <code>chrome://components</code> → “Optimization Guide On Device Model” → <b>Check for update</b>) and wait for the model to download (~2 GB, one time).</li>
+        <li>Reload this page. First “Generate” may download the model — the status line shows progress.</li>
+      </ol>
+      <p>Still nothing? This machine already has the higher-quality local pipeline: run
+      <code>python3 app/server.py</code> and use <code>http://127.0.0.1:8765</code> instead.</p>
+    </details>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const status = m => { $('status').textContent = m; };
+
+/* ---------- TEMPLATE SNAPSHOT (mirror of templates/*.md) ---------- */
+const TEMPLATES = {
+admission: `NAME: Admission Note
+STYLE: Formal English admission note, Taiwan teaching-hospital convention. Third person. Past tense for history, present tense for exam. Standard abbreviations OK (HTN, DM, CAD, s/p, r/o). Concise clinical prose in Present Illness; terse list style elsewhere.
+---
+Chief Complaint:
+[one line, short clinical phrase with duration]
+
+Present Illness:
+[This [age]-year-old [man/woman] with underlying [comorbidities / "no systemic disease"] presented with [symptoms and course in chronological order]. Include pertinent positives and negatives. End with: "Under the impression of [working diagnosis], the patient was admitted for further evaluation and management."]
+
+Past History:
+1. Systemic disease: [list with year / "denied"]
+2. Operation history: [list / "denied"]
+3. Current medications: [list / omit]
+
+Allergy: [drug/food allergies / "NKDA"]
+
+Personal History:
+1. Smoking: [amount and duration / "denied"]
+2. Alcohol: [amount and frequency / "denied"]
+3. Betel nut: [use / "denied"]
+
+Physical Examination:
+Vital signs: BP [___] mmHg, HR [___] bpm, RR [___]/min, BT [___]C, SpO2 [___]%
+Consciousness: [alert and oriented / GCS E_V_M_]
+Chest: [findings / "symmetric expansion, clear breathing sounds"]
+Heart: [findings / "regular heart beats, no murmur"]
+Abdomen: [findings / "soft and flat, no tenderness, normoactive bowel sounds"]
+Extremities: [findings / "freely movable, no pitting edema"]
+
+Laboratory and Image Findings:
+[abnormal labs first with values and units, then relevant normals; then imaging/ECG summaries, each on its own line / omit if no data]
+
+Impression:
+1. [primary diagnosis]
+2. [secondary diagnoses, numbered]
+
+Plan:
+1. [admission, diagnostic workup]
+2. [treatment items with drug/dose only if stated]
+3. [monitoring items]
+---
+RULES:
+- Present Illness must be flowing prose, not bullets.
+- Never invent vital signs, lab values, doses, or dates. Use a quoted default normal phrase ONLY when the bullets say the exam was normal; otherwise write "not recorded".
+- Impression may only contain diagnoses supported by the bullets.`,
+
+procedure: `NAME: Procedure Note
+STYLE: Terse, factual procedure documentation in English. Past tense. One statement per line. Record only what was done and observed.
+---
+Procedure Note
+
+Date/Time: [date and time / "___ (fill in)"]
+Procedure: [full name, include laterality/site]
+Indication: [clinical indication, one line]
+Operator: [operator / "___ (fill in)"]
+Consent: [Written informed consent was obtained from the patient/family prior to the procedure.]
+
+Anesthesia/Sedation: [local lidocaine %, sedation agents and doses, or "none" — only as stated]
+Preparation: [position, sterile prep and drape, ultrasound guidance yes/no / omit]
+
+Procedure details:
+[numbered steps in order; include site, approach, needle/catheter/tube sizes, depths, quantities ONLY if given]
+
+Findings: [what was found/aspirated/visualized, with amounts / omit]
+Specimens: [what was sent and for which studies / "none" / omit]
+Complications: [complications as stated / "No immediate complication was noted."]
+Patient tolerance: [The patient tolerated the procedure well.]
+
+Post-procedure plan:
+1. [monitoring orders]
+2. [pending studies to follow]
+---
+RULES:
+- Never invent sizes, depths, volumes, doses, or times. If a standard field is missing, write "___ (fill in)" — except Complications and Patient tolerance, which default to the quoted phrases only if the procedure was uneventful.
+- Do not add teaching commentary; this is a factual record.`,
+
+consult: `NAME: Consultation Reply
+STYLE: Courteous, focused specialist reply in English. Thank the consulting team, restate the question, give assessment and numbered actionable recommendations.
+---
+Consultation Reply — [specialty]
+
+Thank you for this consultation regarding [age, sex, key diagnosis/context].
+
+Reason for consultation: [the specific question asked]
+
+Summary:
+[2-5 sentences: relevant history, key exam and lab/imaging results bearing on the question. Prose.]
+
+Impression:
+1. [assessment relevant to the question]
+2. [additional findings / omit]
+
+Recommendations:
+1. [specific, actionable — drug with dose/route/frequency only if stated, else the drug class or study]
+2. [further recommendations, numbered]
+
+Thank you for the consultation. Please feel free to contact us for any further questions.
+---
+RULES:
+- Answer the stated reason for consultation directly; if the bullets do not contain the answer, say what further information or study is needed rather than guessing.
+- Never invent drug doses; write the drug name and "(dose per your service's protocol)" if none given.`,
+
+progress: `NAME: Progress Note (SOAP)
+STYLE: Daily ward SOAP note in English. Terse. Standard abbreviations OK. S is the patient's report; O is objective data only; A is a one-line problem-based assessment; P is numbered actions.
+---
+S: [subjective report and events since last note; "no specific complaints" if stable and nothing else given]
+
+O:
+Vital signs: [BP ___/___ mmHg, HR ___ bpm, RR ___/min, BT ___C, SpO2 ___% — only values present; omit fields not given]
+[physical exam findings, one line per system, only systems mentioned]
+[new lab results with values and units / omit]
+[new imaging/study results / omit]
+
+A: [one line per active problem: "#1 problem — status (improving/stable/worsening) on current management"]
+
+P:
+1. [continue/change treatment — drugs and doses only as stated]
+2. [pending or planned studies]
+3. [monitoring / disposition items]
+---
+RULES:
+- Never move subjective statements into O, or objective data into S.
+- Never invent values. Omit any O line for which the bullets give no data.
+- A states a trajectory only if the bullets support it.`
+};
+
+/* Condensed system prompt (mirrors prompts/system-chart.txt, trimmed for Nano's small context) */
+const SYS = `You convert a physician's rough bullet points and lab data into a formatted English hospital chart, following the TEMPLATE exactly.
+Rules:
+- Output ONLY the finished chart. No preamble, no explanation, no markdown code fences.
+- Reproduce the template's headers, order, and fixed phrases exactly.
+- Fill [bracketed slots] only from the physician input. Delete any line whose slot is marked "/ omit" when its info is absent.
+- NEVER invent facts: no made-up vital signs, labs, doses, dates, or findings. Every clinical fact must come from the input or be a fixed template phrase.
+- NEVER add diagnoses or recommendations that the input does not contain.
+- Remove any patient name, chart number, or ID; write "the patient".
+- Turn casual data into chart language (e.g. "sugar 320" -> "glucose 320 mg/dL") only when the unit is standard and unambiguous; otherwise keep the number as given.
+Obey the template's own RULES section; it overrides these if they conflict.
+If the input has no usable clinical information, output exactly: NO INPUT PROVIDED`;
+
+/* ---------- template dropdown + custom slot ---------- */
+const CUSTOM_KEY = 'nanoCustomTemplate';
+(function initTemplates(){
+  const order = ['admission','procedure','consult','progress'];
+  const opts = order.map(t => `<option value="${t}">${t}</option>`).join('') +
+               `<option value="__custom">custom…</option>`;
+  $('tmpl').innerHTML = opts;
+  $('customTmpl').value = localStorage.getItem(CUSTOM_KEY) || '';
+})();
+$('tmpl').onchange = () => {
+  $('customWrap').classList.toggle('hidden', $('tmpl').value !== '__custom');
+};
+$('customTmpl').oninput = () => localStorage.setItem(CUSTOM_KEY, $('customTmpl').value);
+
+function currentTemplate() {
+  if ($('tmpl').value === '__custom') {
+    const t = $('customTmpl').value.trim();
+    if (!t) throw new Error('Custom template is empty — paste a template or pick a chart type.');
+    return t;
+  }
+  return TEMPLATES[$('tmpl').value];
+}
+function buildPrompt(template, bullets) {
+  return `TEMPLATE:\n${template}\n\nPHYSICIAN INPUT:\n${bullets.trim()}`;
+}
+
+/* ---------- Gemini Nano (Prompt API) — defensive across Chrome versions ---------- */
+function dlMonitor(m){
+  m.addEventListener('downloadprogress', e => {
+    const pct = e.total ? e.loaded / e.total : e.loaded;   // newer API: loaded is 0..1
+    status('Downloading Gemini Nano model… ' + Math.round(pct * 100) + '%');
+  });
+}
+
+async function availability(){
+  try {
+    if (self.LanguageModel && LanguageModel.availability) return await LanguageModel.availability();
+    const ns = self.ai && (self.ai.languageModel || self.ai.assistant);
+    if (ns && ns.capabilities) {
+      const c = await ns.capabilities();
+      return ({no:'unavailable','after-download':'downloadable',readily:'available'})[c.available] || c.available;
+    }
+    if (self.ai && self.ai.createTextSession) return 'available';
+  } catch (e) { /* fall through */ }
+  return 'no-api';
+}
+
+// Returns { session, systemApplied }
+async function createSession(){
+  // Newer API: global LanguageModel
+  if (self.LanguageModel && LanguageModel.create) {
+    let sampling = {};
+    try {
+      const p = LanguageModel.params ? await LanguageModel.params() : null;
+      if (p && typeof p.defaultTopK === 'number') {
+        sampling = { topK: p.defaultTopK, temperature: Math.min(0.3, p.maxTemperature || 1) };
+      }
+    } catch (e) {}
+    const base = { initialPrompts: [{ role:'system', content: SYS }], monitor: dlMonitor };
+    try { return { session: await LanguageModel.create({ ...base, ...sampling }), systemApplied: true }; }
+    catch (e1) {
+      try { return { session: await LanguageModel.create(base), systemApplied: true }; }
+      catch (e2) { return { session: await LanguageModel.create({ systemPrompt: SYS, monitor: dlMonitor }), systemApplied: true }; }
+    }
+  }
+  // Older API: window.ai.languageModel / window.ai.assistant
+  const ns = self.ai && (self.ai.languageModel || self.ai.assistant);
+  if (ns && ns.create) {
+    try { return { session: await ns.create({ systemPrompt: SYS, monitor: dlMonitor, temperature: 0.3, topK: 3 }), systemApplied: true }; }
+    catch (e) { return { session: await ns.create({ systemPrompt: SYS }), systemApplied: true }; }
+  }
+  // Legacy: window.ai.createTextSession (no system role)
+  if (self.ai && self.ai.createTextSession) {
+    return { session: await self.ai.createTextSession(), systemApplied: false };
+  }
+  throw new Error('NO_API');
+}
+
+/* ---------- generate ---------- */
+$('genBtn').onclick = async () => {
+  const bullets = $('bullets').value.trim();
+  if (!bullets) { status('Nothing to generate — add bullets first.'); return; }
+  let template;
+  try { template = currentTemplate(); }
+  catch (e) { status(e.message); return; }
+
+  $('genBtn').disabled = true;
+  $('chartOut').value = '';
+  status('Preparing on-device model…');
+  let session;
+  try {
+    const s = await createSession();
+    session = s.session;
+    const userPrompt = buildPrompt(template, bullets);
+    const full = s.systemApplied ? userPrompt : (SYS + '\n\n' + userPrompt);
+
+    status('Generating on-device (Nano is small — a few seconds)…');
+    let acc = '';
+    if (session.promptStreaming) {
+      for await (const chunk of session.promptStreaming(full)) {
+        // Some Chrome versions stream cumulative text, others deltas — handle both.
+        if (acc && chunk.startsWith(acc)) acc = chunk; else acc += chunk;
+        $('chartOut').value = acc;
+      }
+    } else {
+      acc = await session.prompt(full);
+      $('chartOut').value = acc;
+    }
+    status(acc.trim() === 'NO INPUT PROVIDED'
+      ? 'The model found no usable clinical info in the input.'
+      : 'Done. Proofread every line before use.');
+  } catch (e) {
+    if (String(e.message).includes('NO_API')) {
+      status('Gemini Nano is not available in this Chrome. Open the “Enable it” section below.');
+      $('help').open = true;
+    } else {
+      status('Error: ' + e.message);
+    }
+  } finally {
+    try { session && session.destroy && session.destroy(); } catch (e) {}  // fresh session per chart = no cross-patient context
+    $('genBtn').disabled = false;
+  }
+};
+
+$('clearBtn').onclick = () => { $('bullets').value=''; $('chartOut').value=''; status('Ready.'); };
+$('copyBtn').onclick = async () => {
+  try { await navigator.clipboard.writeText($('chartOut').value); status('Copied to clipboard.'); }
+  catch (e) { status('Copy failed — select the text and copy manually.'); }
+};
+
+/* ---------- startup availability check ---------- */
+(async () => {
+  const a = await availability();
+  if (a === 'available') { status('Gemini Nano ready. Enter bullets and Generate.'); $('genBtn').disabled = false; }
+  else if (a === 'downloadable' || a === 'downloading') { status('Gemini Nano available — the model will download on first Generate.'); $('genBtn').disabled = false; }
+  else { status('Gemini Nano not detected in this Chrome. See “Enable it” below.'); $('help').open = true; }
+})();
+</script>
+</body>
+</html>
