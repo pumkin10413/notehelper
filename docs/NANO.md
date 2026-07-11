@@ -8,9 +8,11 @@ network calls, no external scripts. This is the experimental fallback from
 
 ## Why it exists / when to use it
 - Zero-terminal, browser-only charting; or a laptop where Ollama isn't running.
-- PHI-safe: Gemini Nano runs on-device, so bullets never leave the Mac
-  (see [PHI-SAFETY.md](PHI-SAFETY.md) → "On-device exception"). The only download Chrome ever
-  makes is the model binary itself, not your data.
+- Google says Gemini Nano runs on-device, but Chrome is closed-source — you cannot verify
+  that prompts never leave the machine via telemetry, crash reports, or field trials. **Use
+  for de-identified or non-sensitive content only.** For real patient data with identifiers,
+  use the Ollama pipeline instead. See [PHI-SAFETY.md](PHI-SAFETY.md) → "On-device Gemini
+  Nano in Chrome" for the full reasoning.
 - **Quality is lower than the default pipeline** — Nano is a small model with a small context
   window. Proofread harder. Prefer the Ollama app when it's available.
 

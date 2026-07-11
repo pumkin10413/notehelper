@@ -51,12 +51,16 @@ Gemini Nano. Everything else is cloud — even if you open it in a browser tab o
   pipeline, the patient bullets must not pass through its context. Route live patient data
   straight to the local model — the user runs `app/server.py` or `scripts/chart.py`
   themselves. A cloud agent that reads the bullets to "help format" them has already leaked them.
-- **On-device exception — Gemini Nano in Chrome:** Chrome's built-in Prompt API
-  (`window.ai` / on-device Gemini Nano) runs locally, so it is PHI-safe like Ollama. It
-  *could* do the bullets→chart step, but it is a Nano-tier model with a small context window
-  and weaker instruction-following than qwen2.5:7b — expect worse format fidelity. Treat it
-  as an experimental fallback only, and pass `eval/run_eval.py` before trusting it. It does
-  not replace the default pipeline.
+- **On-device Gemini Nano in Chrome — UNVERIFIABLE, treat as gray zone:**
+  Chrome's built-in Prompt API (`window.ai` / Gemini Nano) claims to run inference on-device.
+  Google says prompts stay local. However, **Chrome is closed-source telemetry software** —
+  you cannot audit whether prompt text ever leaves the machine via usage metrics, crash
+  reports, field trials, or future "quality improvement" telemetry. With Ollama/whisper.cpp
+  you have an architectural guarantee (open source, 127.0.0.1 only, firewallable); with
+  Chrome you have a policy promise from an ad company, revocable without notice.
+  **Recommendation:** use `app/chart-nano.html` only for convenience with **non-sensitive or
+  de-identified** content. For real patient data with identifiers, use the Ollama pipeline
+  (`app/server.py` or `scripts/chart.py`) — that is the path you fully control.
 
 ## What the user must still do themselves
 - Proofread every generated chart before it enters the medical record. The app shows this
