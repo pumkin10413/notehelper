@@ -4,3 +4,6 @@ models/*.bin
 .DS_Store
 # Scratch
 *.tmp
+# De-identified samples — never push to a remote (PHI-SAFETY.md)
+samples/*
+!samples/.gitkeep

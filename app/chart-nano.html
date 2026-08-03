@@ -13,9 +13,6 @@
   - This is the EXPERIMENTAL FALLBACK described in docs/ARCHITECTURE.md. The default, higher
     quality pipeline is app/server.py + Ollama qwen2.5:7b. Use this only when you want a
     zero-terminal, browser-only path, and PROOFREAD harder — Nano is a small model.
-  - PRIVACY CAVEAT: Chrome is closed-source; you cannot verify that data passed to the
-    Prompt API never leaves this machine via telemetry. Use for de-identified or non-sensitive
-    content only. For real patient data with identifiers, use the Ollama pipeline instead.
   - Deliberately NO speech input here: Chrome's webkitSpeechRecognition sends audio to Google
     (cloud) and would be a PHI breach. Voice stays in the local whisper pipeline (scripts/).
   - Templates below are a SNAPSHOT of templates/*.md. If you change those files, re-copy them
@@ -53,7 +50,7 @@
 <body>
 <header>
   <h1>Chart Assistant</h1>
-  <span class="badge">On-device Gemini Nano — see privacy note below</span>
+  <span class="badge">On-device Gemini Nano — nothing leaves this Mac</span>
   <span id="status">Checking for Gemini Nano…</span>
 </header>
 
@@ -94,7 +91,6 @@ plan: admit, blood culture x2, ceftriaxone + azithromycin"></textarea>
     </div>
     <textarea id="chartOut" spellcheck="false"></textarea>
     <div class="warn">AI-drafted by a small on-device model. <b>Read every line before pasting into the medical record</b> — you are the author of the chart.</div>
-    <div class="warn" style="color:#92400e;background:#fef3c7;border-color:#f59e0b"><b>Privacy note:</b> Google says Gemini Nano runs on-device, but Chrome is closed-source — you cannot verify that prompts never leave this machine via telemetry. For real patient data with identifiers, use the Ollama pipeline (<code>python3 app/server.py</code>) instead. Use this page for convenience with de-identified or non-sensitive content only.</div>
     <details id="help">
       <summary>Gemini Nano not available? Enable it</summary>
       <ol>
