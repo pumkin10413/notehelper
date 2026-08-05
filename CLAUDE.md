@@ -20,11 +20,18 @@ Voice → text via whisper.cpp; bullets → formatted chart via Ollama. **No pat
 | Chart templates | [templates/](templates/README.md) |
 | LLM prompts (bullets→chart) | [prompts/](prompts/README.md) |
 | CLI tools | [scripts/](docs/ARCHITECTURE.md) — `chart.py`, `dictate.sh`, `voice-chart.sh`, `doctor.sh` |
-| Web app (default, Ollama-backed) | `app/server.py` → http://127.0.0.1:8765 |
-| Browser-only fallback (on-device Gemini Nano, no server) | `app/chart-nano.html` — see [docs/NANO.md](docs/NANO.md) |
+| **Primary tool** — on-device browser page (no server) | `app/chart-nano.html`, published copy `index.html` — see [docs/NANO.md](docs/NANO.md) |
+| Ollama web app (**not being developed** — user paused this path 2026-08-06) | `app/server.py` → http://127.0.0.1:8765 |
 | Regression tests for prompts | [eval/](eval/README.md) |
 | De-identified real samples | `samples/` (user adds; follow PHI-SAFETY checklist) |
 | Instructions for non-Claude agents | [AGENTS.md](AGENTS.md) |
+
+## Current direction (read before planning work)
+The user works in the **browser page** (`app/chart-nano.html` / hosted `index.html`), not the
+Ollama stack. Put new effort there. The Ollama pipeline still works and its prompts/templates
+remain the reference wording, but do not build new features on it unless asked.
+**After editing `app/chart-nano.html`, run `cp app/chart-nano.html index.html`** or the hosted
+page goes stale.
 
 ## Common tasks
 - **Health check first**: `bash scripts/doctor.sh` — run this before debugging anything.

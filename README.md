@@ -1,9 +1,23 @@
 # Chart Assistant (local, private)
 
-Drafts English hospital charts from your bullet points or voice, entirely on this Mac.
-Nothing is ever uploaded anywhere.
+Drafts English hospital charts from your bullet points, voice, or a whole pasted OPD record —
+entirely on your machine. Nothing is ever uploaded anywhere.
 
-## Daily use (2 commands)
+## Daily use — the browser page
+Open **https://pumkin10413.github.io/notehelper/** (or double-click `app/chart-nano.html`).
+Needs Chrome 138+ with the on-device model enabled; the page's **"Model & setup check"** tells
+you exactly what is missing.
+
+- Pick a chart type — **`pi`** gives just the Present Illness paragraph.
+- Tick **"Paste raw OPD record"** for multi-visit records with lab and exam reports.
+- Open **"Extracted timeline"** and check it: the chart is written only from that, and you can
+  edit it and press **Rewrite chart**.
+
+Full guide: [docs/NANO.md](docs/NANO.md).
+
+---
+
+## Ollama pipeline (paused — kept working, not being developed)
 ```bash
 cd ~/Documents/Code/medicalchart
 python3 app/server.py

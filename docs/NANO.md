@@ -1,57 +1,75 @@
-# Browser-only fallback: app/chart-nano.html (on-device Gemini Nano)
+# The on-device page (`app/chart-nano.html` — the primary tool)
 
-A single self-contained HTML file that does the bullets+labs → paragraph chart step **entirely
-in Chrome** using the built-in on-device Gemini Nano (Prompt API). No server, no terminal, no
-network calls, no external scripts. This is the experimental fallback from
-[ARCHITECTURE.md](ARCHITECTURE.md); the **default, higher-quality path is still
-`app/server.py` + Ollama qwen2.5:7b** (see [../README.md](../README.md)).
+A single self-contained HTML file that turns bullets, dictated text, or a **whole pasted OPD
+record** into a formatted English chart using Chrome's built-in on-device Gemini Nano
+(Prompt API). No server, no terminal, no network calls, no external scripts.
 
-## Why it exists / when to use it
-- Zero-terminal, browser-only charting; or a laptop where Ollama isn't running.
-- Google says Gemini Nano runs on-device, but Chrome is closed-source — you cannot verify
-  that prompts never leave the machine via telemetry, crash reports, or field trials. **Use
-  for de-identified or non-sensitive content only.** For real patient data with identifiers,
-  use the Ollama pipeline instead. See [PHI-SAFETY.md](PHI-SAFETY.md) → "On-device Gemini
-  Nano in Chrome" for the full reasoning.
-- **Quality is lower than the default pipeline** — Nano is a small model with a small context
-  window. Proofread harder. Prefer the Ollama app when it's available.
+`index.html` at the repo root is a **byte-identical copy** published via GitHub Pages at
+https://pumkin10413.github.io/notehelper/ . **After editing `app/chart-nano.html` you must
+re-copy it**, or the hosted page silently goes stale:
+```bash
+cp app/chart-nano.html index.html
+```
 
-## How to open it
-Either:
-- Double-click `app/chart-nano.html` (file:// is a secure context in Chrome), or
-- Serve it locally and open http://127.0.0.1:8766/chart-nano.html:
-  `python3 -m http.server 8766 --directory app`
-  (http origin is sometimes needed for the Prompt API; the `nano-static` entry in
-  `.claude/launch.json` starts exactly this.)
+## What it does
+- Chart types: **`pi`** (Present Illness only), `admission`, `procedure`, `consult`,
+  `progress`, plus a **custom…** slot saved in the browser (localStorage).
+- **Paste raw OPD record** checkbox: cleans the text, extracts a structured timeline in as many
+  chunks as the browser's context allows, merges them deterministically, then writes the chart.
+- **Extracted timeline** panel: the chart is written *only* from this, so anything missing here
+  is missing from the chart. You can **edit the timeline and press "Rewrite chart"** — the
+  fastest way to fix a bad output without re-running extraction.
+- **Model & setup check**: reports the Prompt API flavour, availability, context window, and
+  whether the browser is an echo stub. Run this first when anything looks wrong.
 
-First "Generate" downloads the Nano model (~2 GB, one time); the status line shows progress.
-If the page says Nano isn't available, follow the on-page "Enable it" steps (Chrome 138+,
-two `chrome://flags`, then `chrome://on-device-internals`).
+## Hard-won constraints (measured 2026-08-06 — do not undo these)
+1. **Never hardcode a context size.** Nano's window differs between Chrome builds. Budgets come
+   from `session.contextWindow` + `measureContextUsage()` at runtime (`charBudget()`), reserving
+   45% of the window for the answer. If the browser reports nothing, a conservative fallback is
+   used. This is why long records are chunked into "as many pieces as *this* browser needs".
+2. **Echo-stub detection is a safety feature, not a nicety.** Some Chromium builds expose the
+   Prompt API with no model and echo the prompt back verbatim. Without `detectStub()` the page
+   would display the physician's own input as a finished chart. It now raises a hard error and
+   leaves the output empty. Never remove this guard.
+3. **The model download needs a real user gesture.** Chrome throws
+   `NotAllowedError: Requires a user gesture` if `create()` is called outside a click handler,
+   so creation must stay inside the Generate/check button handlers.
+4. **No speech input here.** Chrome's `webkitSpeechRecognition` sends audio to Google, which
+   would be a PHI breach. Voice stays in the local whisper pipeline (`scripts/dictate.sh`).
+5. **Prompts are deliberately short.** Every character of system prompt and template is one the
+   record cannot use. Keep the safety rules, cut the prose. Do not paste the long
+   `templates/*.md` bodies in here — the embedded ones are intentionally condensed.
 
-## What it deliberately does NOT do
-- **No voice input.** Chrome's `webkitSpeechRecognition` sends audio to Google (cloud) = PHI
-  breach. Voice stays in the local whisper pipeline (`scripts/dictate.sh`). Do not add browser
-  speech recognition to this file.
-- No persistence of charts. A fresh model session is created per generation (no cross-patient
-  context) and destroyed after.
+## Verified vs unverified (be honest with the user about this)
+Verified in a Chromium test browser on 2026-08-06:
+- deterministic cleaning: identifiers (name / chart no / Taiwan national ID) removed, full-width
+  `４０mg`→`40mg`, page/print/separator boilerplate dropped;
+- chunking adapts to the budget (2 chunks at a 300-char budget, 1 at 5000);
+- timeline merge across chunks: dedupes, prefers real values over "not stated", takes the last
+  real DISPOSITION, and re-sorts events chronologically even when chunks arrive out of order;
+- echo-stub detection: catches the stub, does not false-positive on real prose;
+- the failure path: clear error, empty chart, diagnostics auto-opened.
 
-## Maintaining it (for any model editing this file)
-- The 4 templates and the system prompt are **embedded snapshots** of `templates/*.md` and
-  `prompts/system-chart.txt` (search `TEMPLATE SNAPSHOT` and `const SYS` in the HTML). If you
-  change those source files, re-copy the relevant text into the HTML, or the two paths drift.
-  The embedded system prompt is intentionally a *trimmed* version — Nano's context is small;
-  keep it short but never weaken the "NEVER invent facts" rules.
-- The Prompt API changes between Chrome versions. The code already handles: global
-  `LanguageModel` vs `window.ai.languageModel` vs legacy `createTextSession`; missing
-  `LanguageModel.params()`; `initialPrompts` vs `systemPrompt`; cumulative vs delta streaming.
-  If a new Chrome breaks it, extend `createSession()` / `availability()` defensively (try/catch
-  a new shape, fall back to the old) rather than replacing what's there.
-- Users can add their own template in the UI ("custom…" option, saved to localStorage) without
-  editing the file. That is the supported way for the user to try a format; promoting it to a
-  real template still goes through the `/add-template` skill + eval.
+**NOT verified: real Gemini Nano generation quality.** The available test browser was Chromium
+with an echo stub, so no real chart has ever been produced by this page. The first person to run
+it on a proper Chrome must judge whether Nano's output is good enough, and how much of a record
+fits per chunk. Expect Nano to be markedly weaker than a 7B model at following the template.
 
-## Verified 2026-07-08
-Page loads with no JS errors; degrades gracefully when Nano is absent; on a Chrome with the
-Prompt API it reported `availability: downloadable` and enabled Generate; prompt assembly
-matches `chart.py` exactly (`TEMPLATE:\n…\n\nPHYSICIAN INPUT:\n…`); custom-empty guard works.
-End-to-end inference not run here (needs the one-time model download on the user's machine).
+## If the page says the model is unavailable
+1. Use **Chrome 138+**, not Chromium (`chrome://version`).
+2. Enable and relaunch: `chrome://flags/#prompt-api-for-gemini-nano`, and
+   `chrome://flags/#optimization-guide-on-device-model` → **Enabled BypassPerfRequirement**.
+3. `chrome://on-device-internals` → wait for the ~2 GB one-time model download.
+4. Reload and click Generate.
+
+## Maintaining it
+All logic is exposed as `window.NanoCore` so it can be tested from the console without the UI:
+```js
+NanoCore.cleanRecord(text)        // {cleaned, stats}
+NanoCore.chunkRecord(text, 1200)  // string[]
+NanoCore.mergeTimelines([...])    // merged timeline object
+NanoCore.probeCapabilities()      // what this browser can actually do
+```
+Change extraction behaviour in `SYS_EXTRACT`, prose behaviour in `TEMPLATES[...]`, both near the
+top of the `<script>`. The embedded templates are condensed relatives of `templates/*.md`; when
+you change one, consider whether the other needs the same fix, and re-copy to `index.html`.

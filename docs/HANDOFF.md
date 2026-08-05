@@ -45,6 +45,38 @@ Next session should: <one concrete goal>
 
 ---
 
+## 2026-08-06 — Claude (Opus 5) — Nano page becomes the primary tool; feature parity + hard safety fix
+**DIRECTION CHANGE from the user: all future work goes to the browser/Nano page. The Ollama
+stack is paused indefinitely.** Roadmap items below are rewritten accordingly.
+Done:
+- Rebuilt `app/chart-nano.html` (and synced `index.html`) with: the **`pi` Present-Illness-only**
+  type, **raw OPD record mode** with runtime-budgeted chunking, an editable **timeline panel**
+  with "Rewrite chart from this timeline", a **Model & setup check** panel, progress bar, and all
+  five prompt-hardening rules from the Ollama work (no invented values/age/sex/disposition, no
+  arithmetic, `r/o` = suspected).
+- **Safety fix (important):** some Chromium builds expose the Prompt API with no model and echo
+  the prompt back. The previous page would have displayed the physician's own input as a finished
+  chart. `detectStub()` now raises a hard error, leaves the output empty and opens diagnostics.
+- Nothing hardcodes a context size: `charBudget()` derives chunk size from
+  `session.contextWindow` + `measureContextUsage()`, reserving 45% for the answer.
+- Logic exposed as `window.NanoCore` so it is testable from the console with no UI.
+- Docs rewritten: `docs/NANO.md` (constraints, verified-vs-unverified, maintenance), CLAUDE.md
+  router now names the Nano page as primary and warns about the `cp` sync step.
+Verified (Chromium test browser): cleaning + identifier redaction + full-width conversion,
+adaptive chunking, cross-chunk timeline merge (dedupe, chronological re-sort, "not stated"
+handling), stub detection with no false positive on real prose, and the failure UI.
+Not done / broken — **READ THIS FIRST NEXT SESSION**:
+- **Real Gemini Nano has still never generated a chart here.** The only available browser was
+  Chromium with an echo stub (`contextWindow` 1000 was the stub's dummy value, NOT real Nano).
+  Output quality, real context size, and how much record fits per chunk are all UNKNOWN.
+- Chrome needs a real user gesture to start the model download; creation must stay inside click
+  handlers (`NotAllowedError` otherwise).
+Next session should: **have the user open the page in real Chrome 138+ and press "Run check",
+then generate one `pi` chart from a de-identified OPD record.** Record the real `contextWindow`
+and the output quality in this log. Only then decide whether Nano is good enough, whether the
+chunk budget needs tuning, or whether the templates must shrink further. Do not build more
+features on Nano before that measurement exists.
+
 ## 2026-07-08 — Claude (Opus 5) — Raw OPD record input + Present-Illness-only template
 Done:
 - **New `--raw` two-stage pipeline** for pasted multi-visit OPD records + exam reports:
