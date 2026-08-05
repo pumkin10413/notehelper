@@ -366,12 +366,28 @@ RULES: copy numbers, units, doses and dates EXACTLY. Never do arithmetic and nev
 
 const TEMPLATES = {
 pi:`NAME: Present Illness only
-Output ONLY the Present Illness narrative in English prose. No headings, no chief complaint, no impression, no plan. Begin with "This".
-Open: "This [age]-year-old [man/woman] with underlying [every chronic disease, year exactly as given] ..." — if age or sex is not stated write "This patient" and never guess either.
-Then one paragraph per date, chronological: the symptoms, examination findings, laboratory values (with unit) and study results belonging to THAT date, written as sentences.
-Include EVERY laboratory value and study finding, including ones unrelated to the main complaint. Weave each into the sentence for its date. Never write a list, and never write "Laboratory results included:" or "Studies included:".
-Close with the disposition ONLY if the input states one actually happened; otherwise write no closing sentence and simply end at the last recorded event.
-RULES: never invent a value, date, dose, age, sex or disposition; never do arithmetic; "r/o X" means X is suspected; no names or chart numbers; no bullet points anywhere.`,
+Output ONLY the Present Illness narrative in English prose, ready to paste into the Present Illness field of an admission note. No headings, no "Present Illness:" label, no chief complaint, no past-history list, no impression, no plan. Your first word is "This".
+
+OPENING SENTENCE:
+"This [age]-year-old [man/woman] with underlying [EVERY chronic diagnosis in the input, most clinically relevant first, each keeping the year exactly as the input words it] [has been followed up at our outpatient department for [condition] / was relatively well] until [onset time], when [first symptom] developed."
+Scan the WHOLE input for chronic diagnoses first — they hide in past-history sections, problem lists and old visit notes, and missing one is the most common failure here. If the input states no chronic disease, write "no known systemic disease".
+If age is not stated, write "This patient" and never a number. If sex is not stated, do not write "man" or "woman". Never infer either from context or from a diagnosis.
+
+BODY — one paragraph per date, in strict chronological order. Each paragraph states, in its own sentences, what belongs to THAT date:
+- what the patient reported, and how each symptom changed since the previous visit (onset, character, severity, timing, aggravating/relieving factors, better or worse after treatment)
+- what was found on examination
+- what was done: drug started or adjusted (dose only if stated), study ordered, referral
+- every laboratory value from that date, with its unit, written inside a sentence: "...laboratory studies showed a hemoglobin of 8.9 g/dL, blood urea nitrogen 28 mg/dL, and creatinine 1.6 mg/dL."
+- every study from that date with its reported findings
+- the pertinent negatives the input explicitly records
+Include EVERY laboratory value and study finding in the input, including chronic-disease values that look unrelated to the complaint (HbA1c, creatinine, eGFR, lipids). Length is fine; omission is not.
+Never gather values from several dates into one summary sentence or block. Never write a list, a bullet, a numbered line, or any collecting phrase such as "Laboratory results included:", "Studies included:" or "Labs:". If a value belongs to a date you already described, add it to that existing sentence.
+
+CLOSING — conditional:
+Only if the input states a disposition that actually happened, write: "Therefore, the patient [the input's own wording] for further evaluation and management."
+If the input states no disposition, or only continued outpatient follow-up, write NO closing sentence — end at the last recorded event. Never manufacture an admission, an emergency department visit or a referral to round the story off.
+
+RULES: never invent a value, date, dose, finding, age, sex, diagnosis or disposition. Never do arithmetic — "since 2018" stays "since 2018", never "(4 years)". "r/o X" means X is SUSPECTED, never that X was ruled out. Never turn a symptom into a diagnosis the input did not state. If the input gives conflicting values for one item, report both with their times. Write "the patient" — never a name or chart number. No bullet points anywhere.`,
 
 admission:`NAME: Admission Note
 Chief Complaint:

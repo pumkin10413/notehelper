@@ -40,6 +40,23 @@ cp app/chart-nano.html index.html
    record cannot use. Keep the safety rules, cut the prose. Do not paste the long
    `templates/*.md` bodies in here — the embedded ones are intentionally condensed.
 
+## Measured on the user's real Chrome (2026-08-06)
+```
+Prompt API:      LanguageModel
+Availability:    available
+Context window:  9216 tokens
+Echo stub:       no
+Sample reply:    ok
+```
+Real Gemini Nano works on this machine and reports a **9216-token** window — 9× the 1000 the
+Chromium echo stub reported. Consequences:
+- Most single OPD records fit in **one chunk**, so cross-chunk merge artifacts are rare. Chunking
+  still matters for long records and must stay.
+- There is room for reasonably detailed templates; they no longer need to be squeezed to the
+  bone. Do not bloat them without cause, but do not sacrifice a safety rule to save 200 chars.
+- `charBudget()` reserves 45% of the window for the answer, so ~4,700 tokens of record per
+  extraction call. Tune that reserve only with a measurement, not a guess.
+
 ## Verified vs unverified (be honest with the user about this)
 Verified in a Chromium test browser on 2026-08-06:
 - deterministic cleaning: identifiers (name / chart no / Taiwan national ID) removed, full-width

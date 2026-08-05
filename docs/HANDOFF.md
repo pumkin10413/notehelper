@@ -65,17 +65,28 @@ Done:
 Verified (Chromium test browser): cleaning + identifier redaction + full-width conversion,
 adaptive chunking, cross-chunk timeline merge (dedupe, chronological re-sort, "not stated"
 handling), stub detection with no false positive on real prose, and the failure UI.
+**UPDATE, same day — real Chrome measured by the user:**
+```
+Prompt API: LanguageModel | Availability: available | Context window: 9216 tokens | Echo stub: no
+```
+Real Nano works and the window is **9216 tokens**, 9× the echo stub's dummy 1000. Acted on this:
+- `charBudget()` now yields **~14,000–16,500 chars per extraction chunk**, so a typical OPD
+  record fits in ONE chunk (chunking still needed for long ones).
+- Spent the headroom on quality: the embedded `pi` template was expanded from ~1.1k to ~3.2k
+  chars, restoring the detailed per-visit BODY guidance, the "scan the whole input for chronic
+  diagnoses" instruction, and the worked example for weaving labs into a date's sentence. All
+  five safety rules verified still present.
 Not done / broken — **READ THIS FIRST NEXT SESSION**:
-- **Real Gemini Nano has still never generated a chart here.** The only available browser was
-  Chromium with an echo stub (`contextWindow` 1000 was the stub's dummy value, NOT real Nano).
-  Output quality, real context size, and how much record fits per chunk are all UNKNOWN.
+- **Real Nano has still never produced an actual chart.** Availability and window are confirmed;
+  OUTPUT QUALITY IS STILL UNMEASURED. The test browser here is an echo stub, so only the user
+  can run this.
 - Chrome needs a real user gesture to start the model download; creation must stay inside click
   handlers (`NotAllowedError` otherwise).
-Next session should: **have the user open the page in real Chrome 138+ and press "Run check",
-then generate one `pi` chart from a de-identified OPD record.** Record the real `contextWindow`
-and the output quality in this log. Only then decide whether Nano is good enough, whether the
-chunk budget needs tuning, or whether the templates must shrink further. Do not build more
-features on Nano before that measurement exists.
+Next session should: **get one real `pi` chart out of the page** from a de-identified OPD record
+and paste the output into this log. Judge: does Nano keep the template, keep every lab, avoid the
+five hallucination classes? Then tune — likely candidates are shrinking `admission` (still
+condensed for the old tiny window) or lowering the 45% answer reserve. Do not add features until
+a real output has been read.
 
 ## 2026-07-08 — Claude (Opus 5) — Raw OPD record input + Present-Illness-only template
 Done:
