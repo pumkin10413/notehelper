@@ -14,6 +14,15 @@ Open **http://127.0.0.1:8765** → type bullets or hit 🎙 Dictate → pick cha
 Tip: make it one word — add to `~/.zshrc`:
 `alias chartapp='cd ~/Documents/Code/medicalchart && python3 app/server.py'`
 
+## Pasting a whole OPD record
+Got several outpatient visits plus lab and exam reports instead of tidy bullets? Tick
+**"Paste raw OPD record"** in the web app (or add `--raw` on the CLI). It cleans the text,
+extracts a timeline, then writes the chart — two passes, ~1–3 min.
+**Open "Extracted timeline" and check it first:** anything missing there cannot appear in the
+chart, and scanning that list is much faster than proofreading prose against a 3-page record.
+Pick chart type **`pi`** to get only the Present Illness paragraph, underlying diseases included.
+Full guide + known limitations: [docs/OPD-RECORDS.md](docs/OPD-RECORDS.md).
+
 ## Browser-only option (no terminal, on-device Gemini Nano)
 Double-click `app/chart-nano.html` (or serve it: `python3 -m http.server 8766 --directory app`
 → http://127.0.0.1:8766/chart-nano.html). Runs the bullets→chart step entirely in Chrome, no

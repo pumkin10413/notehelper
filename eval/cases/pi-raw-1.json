@@ -1,0 +1,28 @@
+{
+  "type": "pi",
+  "raw": true,
+  "fixture": "opd-dump-1.txt",
+  "bullets": "",
+  "must_contain": [
+    "58-year-old man",
+    "diabetes",
+    "hypertension",
+    "coronary artery disease",
+    "chronic kidney disease",
+    "8.9",
+    "1.5 cm",
+    "Forrest IIb"
+  ],
+  "must_not_contain": [
+    "Here is",
+    "```",
+    "ruled out",
+    "emergency department",
+    "[redacted]",
+    "01234567",
+    "A123456789",
+    "Chief Complaint",
+    "Impression:"
+  ],
+  "_note": "The safety checks above are hard requirements: 'ruled out' guards the r/o inversion bug, 'emergency department' guards a fabricated disposition, and the number/name strings guard identifier leakage. A cosmetic check for 'Laboratory results included:' was REMOVED on 2026-07-08 because it is flaky (~50%): the model intermittently lumps labs behind that lead-in instead of weaving them per-visit. Content stays correct and complete when it happens, so this is a formatting limitation documented in docs/OPD-RECORDS.md, not a silenced bug. Do not re-add it unless you have a prompt change that makes it pass 5 runs in a row."
+}

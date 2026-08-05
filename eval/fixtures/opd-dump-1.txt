@@ -1,0 +1,82 @@
+═══════════════════════════════════════
+　　　國立　示範醫學中心
+     OUTPATIENT DEPARTMENT RECORD
+═══════════════════════════════════════
+Printed: 2026/06/30 14:22
+Page 1 of 3
+
+姓名: 王大明          病歷號: 01234567
+身分證字號: A123456789
+Sex/Age: M / 58
+
+---------------------------------------
+[OPD 2026/05/28] GI Clinic  Dr. Chen
+S: still epigastric pain, worse at night, wakes him up. Took the PPI only
+   irregularly. Denies hematemesis. Reports black stool x2 days ago.
+O: conjunctiva pale. abd soft, epigastric tenderness (+), no rebounding
+A: suspect peptic ulcer bleeding
+P: check CBC today, arrange panendoscopy, admit if Hb low
+   Pantoprazole ４０mg qd continued
+
+Page 2 of 3
+---------------------------------------
+[OPD 2026/04/16] GI Clinic
+S: epigastric burning pain for about 2 weeks, related to meals, no radiation.
+   No fever. No weight loss. Appetite fair.
+O: abd soft and flat, mild epigastric tenderness, BS normoactive
+A: dyspepsia, r/o peptic ulcer disease
+P: Pantoprazole 40mg qd x 4 weeks, avoid NSAID, F/U 4 weeks
+   Note: patient takes Aspirin from CV clinic - discussed, continue for now
+
+---------------------------------------
+PAST HISTORY (from CV clinic note 2025/11/03):
+  1. Type 2 diabetes mellitus, diagnosed 2016, on Metformin 500mg bid
+  2. Hypertension, diagnosed 2014, on Amlodipine 5mg qd
+  3. Coronary artery disease s/p PCI to LAD 2023, on Aspirin 100mg qd
+  4. Chronic kidney disease stage 3
+  Allergy: denied
+  Smoking: 1 PPD x 30 years, quit 2023. Alcohol: social. Betel nut: denied.
+
+═══════════════════════════════════════
+LABORATORY REPORT
+═══════════════════════════════════════
+Collected 2026/05/28
+  WBC      7.8   x10^3/uL
+  Hb       8.9   g/dL   (L)
+  Platelet 245   x10^3/uL
+  BUN      28    mg/dL  (H)
+  Creatinine 1.6 mg/dL  (H)
+  eGFR     45    mL/min/1.73m2
+
+Collected 2026/04/16
+  Hb       12.4  g/dL
+  HbA1c    7.8   %      (H)
+
+Page 3 of 3
+═══════════════════════════════════════
+EXAMINATION REPORT
+═══════════════════════════════════════
+Study: Panendoscopy    Date: 2026/06/02
+Findings: A 1.5 cm ulcer with adherent clot at gastric antrum, Forrest IIb.
+  Multiple erosions at antrum. No active bleeding at the time of examination.
+  CLO test: positive.
+Impression: Gastric ulcer with recent bleeding, H. pylori infection.
+
+Study: Abdominal ultrasound   Date: 2026/06/02
+Findings: Liver normal echogenicity, no focal lesion. Gallbladder without stone.
+  Both kidneys with increased parenchymal echogenicity, consistent with chronic
+  renal parenchymal disease.
+
+---------------------------------------
+[OPD 2026/06/25] GI Clinic
+S: epigastric pain much improved after treatment. No more black stool.
+   Completed H. pylori eradication therapy. Appetite improved.
+O: conjunctiva less pale, abd soft, no tenderness
+A: Gastric ulcer, post eradication. Anemia improving.
+P: recheck Hb today. Continue Pantoprazole. Arrange follow-up endoscopy 8 weeks.
+   Refer to admission if symptoms recur.
+
+Collected 2026/06/25
+  Hb       10.8  g/dL   (L)
+---------------------------------------
+CONFIDENTIAL - property of the hospital

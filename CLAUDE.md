@@ -15,6 +15,7 @@ Voice → text via whisper.cpp; bullets → formatted chart via Ollama. **No pat
 | System design & model choices | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Install & verify everything | [docs/SETUP.md](docs/SETUP.md) |
 | PHI / de-identification rules | [docs/PHI-SAFETY.md](docs/PHI-SAFETY.md) |
+| Pasting raw OPD records (multi-visit + exam reports) | [docs/OPD-RECORDS.md](docs/OPD-RECORDS.md) |
 | Session plan + handoff log | [docs/HANDOFF.md](docs/HANDOFF.md) |
 | Chart templates | [templates/](templates/README.md) |
 | LLM prompts (bullets→chart) | [prompts/](prompts/README.md) |
@@ -28,6 +29,8 @@ Voice → text via whisper.cpp; bullets → formatted chart via Ollama. **No pat
 ## Common tasks
 - **Health check first**: `bash scripts/doctor.sh` — run this before debugging anything.
 - **Generate a chart**: `python3 scripts/chart.py --type admission --bullets "..."` or use the `/chart` skill.
+- **Raw OPD record** (multiple visits + lab/exam reports): add `--raw` — `python3 scripts/chart.py --type pi --raw --show-timeline --file dump.txt`. Two passes; read the timeline first. See [docs/OPD-RECORDS.md](docs/OPD-RECORDS.md).
+- **Present Illness only**: `--type pi` — outputs just the PI narrative, underlying diseases included.
 - **Start the web app**: `python3 app/server.py` then open http://127.0.0.1:8765
 - **Add a template from a sample**: use the `/add-template` skill; de-identify first (PHI-SAFETY.md checklist).
 - **Changed a prompt or template?** Run the eval: see [eval/README.md](eval/README.md). Do not ship a prompt change that fails eval.

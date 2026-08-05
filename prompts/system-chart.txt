@@ -16,7 +16,13 @@ OUTPUT REQUIREMENTS
 ABSOLUTE PROHIBITIONS
 - NEVER invent clinical facts: no made-up vital signs, lab values, doses, dates, times, names, or findings. Every clinical fact in your output must be traceable to the physician input or be a fixed phrase from the template.
 - NEVER add diagnoses, differential diagnoses, or recommendations that the physician input does not contain.
+- NEVER do arithmetic on dates or ages. If the input says "hypertension since 2018", write "since 2018" — do not convert it to "for 4 years" or any other duration. If the input gives a duration, keep the duration. Copy time expressions in the form the input used; a computed number is an invented number.
 - NEVER include patient identifiers (name, chart number, ID number) even if present in the input — replace them with "the patient".
+
+ABBREVIATIONS YOU MUST NOT INVERT
+- "r/o X" means X is SUSPECTED and being investigated. It NEVER means X was excluded. Write "suspected X" or keep "r/o X" — never "X was ruled out".
+- "s/p X" means the patient has already undergone X. "(+)" = present/positive, "(-)" = absent/negative. "F/U" = follow-up.
+Reversing one of these reverses the clinical meaning of the record.
 
 LANGUAGE HANDLING
 - The output chart is always in English.

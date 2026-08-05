@@ -73,8 +73,13 @@ class Handler(BaseHTTPRequestHandler):
                 if not req.get("bullets", "").strip():
                     self._send(400, {"error": "empty input"})
                     return
-                text = chart.generate(req["type"], req["bullets"])
-                self._send(200, {"chart": text})
+                if req.get("raw"):
+                    # Raw OPD/EMR dump: clean -> extract timeline -> write chart.
+                    text, timeline, stats = chart.generate_from_raw(req["type"], req["bullets"])
+                    self._send(200, {"chart": text, "timeline": timeline, "stats": stats})
+                else:
+                    text = chart.generate(req["type"], req["bullets"])
+                    self._send(200, {"chart": text})
             elif self.path == "/api/transcribe":
                 if not os.path.exists(WHISPER_MODEL):
                     self._send(500, {"error": "whisper model missing — see docs/SETUP.md step 3"})

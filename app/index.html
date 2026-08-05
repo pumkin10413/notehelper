@@ -25,6 +25,12 @@
   button.rec-on { background:#dc2626; }
   button:disabled { opacity:.5; cursor:default; }
   #status { font-size:13px; color:#555; min-height:1.2em; }
+  .rawtoggle { font-weight:600; font-size:13px; display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; }
+  .rawtoggle span { font-weight:400; color:#666; font-size:12px; }
+  details summary { cursor:pointer; font-weight:600; font-size:13px; }
+  #tlStats { font-weight:400; color:#666; font-size:12px; }
+  #timelineOut { min-height:220px; font-family:ui-monospace, Menlo, monospace; font-size:12px; white-space:pre-wrap; }
+  .hidden { display:none; }
   .warn { font-size:12px; color:#8a5a00; background:#fff7e0; border:1px solid #eedc9a; border-radius:8px; padding:6px 10px; }
 </style>
 </head>
@@ -41,6 +47,9 @@
       <select id="tmpl"></select>
       <button id="recBtn" class="secondary" type="button">🎙 Dictate</button>
     </div>
+    <label class="rawtoggle"><input type="checkbox" id="rawMode"> Paste raw OPD record
+      <span>— multiple visits + lab/exam reports. Cleans the text, extracts a timeline, then writes the chart (slower, two passes).</span>
+    </label>
     <label for="bullets">Bullets / dictation</label>
     <textarea id="bullets" placeholder="65M, DM type 2 / HTN
 fever and productive cough 3 days
@@ -61,6 +70,11 @@ plan: admit, blood culture x2, ceftriaxone + azithromycin"></textarea>
     </div>
     <textarea id="chartOut" spellcheck="false"></textarea>
     <div class="warn">AI-drafted. <b>Read every line before pasting into the medical record</b> — you are the author of the chart.</div>
+    <details id="tlWrap" class="hidden">
+      <summary>Extracted timeline <span id="tlStats"></span></summary>
+      <div class="warn" style="margin:8px 0">Check this first: if a value is missing or wrong here, it will be missing or wrong in the chart. Everything the chart says comes from this timeline.</div>
+      <textarea id="timelineOut" spellcheck="false"></textarea>
+    </details>
   </section>
 </main>
 <script>
@@ -76,7 +90,7 @@ async function api(path, opts) {
 
 // -------- templates dropdown --------
 api('/api/templates').then(j => {
-  const preferred = ['admission', 'procedure', 'consult', 'progress'];
+  const preferred = ['pi', 'admission', 'procedure', 'consult', 'progress'];
   const names = j.templates.sort((a, b) =>
     (preferred.indexOf(a) + 99 * (preferred.indexOf(a) < 0)) -
     (preferred.indexOf(b) + 99 * (preferred.indexOf(b) < 0)));
@@ -87,16 +101,28 @@ api('/api/templates').then(j => {
 $('genBtn').onclick = async () => {
   const bullets = $('bullets').value.trim();
   if (!bullets) { status('Nothing to generate — add bullets first.'); return; }
+  const raw = $('rawMode').checked;
   $('genBtn').disabled = true;
-  status('Generating (local model, ~10–40s)...');
+  status(raw ? 'Cleaning record, extracting timeline, then writing (two passes, ~1–3 min)...'
+             : 'Generating (local model, ~10–40s)...');
   try {
     const j = await api('/api/generate', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({type: $('tmpl').value, bullets})
+      body: JSON.stringify({type: $('tmpl').value, bullets, raw})
     });
     $('chartOut').value = j.chart;
-    status('Done. Proofread before use.');
+    if (j.timeline) {
+      $('timelineOut').value = j.timeline;
+      $('tlStats').textContent = j.stats
+        ? `— ${j.stats.lines_dropped} noise lines removed, ${j.stats.identifiers_redacted} identifiers redacted`
+        : '';
+      $('tlWrap').classList.remove('hidden');
+    } else {
+      $('tlWrap').classList.add('hidden');
+    }
+    status(raw ? 'Done. Check the extracted timeline, then proofread the chart.'
+               : 'Done. Proofread before use.');
   } catch (e) {
     status('Error: ' + e.message);
   } finally {

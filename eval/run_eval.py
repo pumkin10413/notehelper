@@ -42,7 +42,15 @@ def run_case(path):
     with open(path, encoding="utf-8") as f:
         case = json.load(f)
     name = os.path.basename(path)[:-5]
-    out = chart.generate(case["type"], case["bullets"])
+    if case.get("raw"):
+        # Two-stage path: bullets may name a fixture file under eval/fixtures/.
+        src = case.get("fixture")
+        raw_text = (chart.read_file(os.path.join(ROOT, "eval", "fixtures", src))
+                    if src else case["bullets"])
+        out, timeline, _ = chart.generate_from_raw(case["type"], raw_text)
+        case = dict(case, bullets=raw_text + "\n" + timeline)  # numbers may come from either
+    else:
+        out = chart.generate(case["type"], case["bullets"])
     template = open(os.path.join(ROOT, "templates", case["type"] + ".md"), encoding="utf-8").read()
     failures = []
 

@@ -38,6 +38,7 @@ RULES:
 - `procedure.md` — Procedure note. Priority 1.
 - `consult.md` — Consultation reply. Priority 2.
 - `progress.md` — Daily SOAP progress note. Priority 2.
+- `pi.md` — **Present Illness only** (no headers/impression/plan). Built for raw OPD record input; favours completeness over brevity. See [../docs/OPD-RECORDS.md](../docs/OPD-RECORDS.md).
 
 These skeletons are generic Taiwan-teaching-hospital style. They are meant to be **overwritten by
 the user's real de-identified formats** — treat the user's samples as authoritative over these.

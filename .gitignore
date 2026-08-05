@@ -7,3 +7,6 @@ models/*.bin
 # De-identified samples — never push to a remote (PHI-SAFETY.md)
 samples/*
 !samples/.gitkeep
+# Python bytecode
+__pycache__/
+*.pyc
