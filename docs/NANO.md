@@ -85,11 +85,24 @@ it on a proper Chrome must judge whether Nano's output is good enough, and how m
 fits per chunk. Expect Nano to be markedly weaker than a 7B model at following the template.
 
 ## If the page says the model is unavailable
-1. Use **Chrome 138+**, not Chromium (`chrome://version`).
-2. Enable and relaunch: `chrome://flags/#prompt-api-for-gemini-nano`, and
-   `chrome://flags/#optimization-guide-on-device-model` → **Enabled BypassPerfRequirement**.
-3. `chrome://on-device-internals` → wait for the ~2 GB one-time model download.
-4. Reload and click Generate.
+Only do this when "Run check" reports unavailable. On this user's machine it already reports
+available, so setup is done.
+
+**Do not hand anyone a `chrome://flags/#flag-name` deep link.** Two reasons it appears broken:
+Chrome refuses to let a web page navigate to a `chrome://` URL at all (it must be pasted into the
+address bar), and the `#anchor` only highlights a flag when that exact ID exists in that build —
+if the flag was renamed or now ships enabled by default, you land on a plain flags page with
+nothing selected. Tell people to use the flags **search box** instead.
+
+1. `chrome://version` — need **Chrome 138+**, and real Chrome. Chromium usually has no model and
+   silently echoes the prompt back (see the stub guard above).
+2. `chrome://flags` → search `on-device`, then `prompt api`:
+   - "Prompt API for Gemini Nano" → **Enabled**
+   - "Enables optimization guide on device" → **Enabled BypassPerfRequirement** (not plain Enabled)
+   - A search returning nothing usually means that piece already ships enabled — move on.
+3. Relaunch, then `chrome://on-device-internals` for the one-time ~2 GB download. This page, not
+   the flags page, is the authority on whether the model is actually present.
+4. Press **Run check** on the page.
 
 ## Maintaining it
 All logic is exposed as `window.NanoCore` so it can be tested from the console without the UI:

@@ -109,17 +109,28 @@ plan: admit, blood culture x2, ceftriaxone"></textarea>
       <div class="row" style="margin-top:8px"><button id="testBtn" class="secondary" type="button">Run check</button></div>
       <pre id="diagOut" class="muted" style="white-space:pre-wrap"></pre>
       <div id="help">
-        <p><b>If the model is unavailable:</b></p>
+        <p><b>Only needed if the check above says the model is unavailable.</b> If it reports
+        “available” with no stub, you are already set up — ignore this section.</p>
+        <p class="muted">Chrome blocks web pages from linking to <code>chrome://</code> addresses, so
+        <b>copy each one into the address bar</b>. Don't use a <code>#flag-name</code> deep link:
+        it only jumps to the flag if that exact ID exists in your build, and does nothing at all
+        when the flag has been renamed or already ships enabled — which looks like a broken link.</p>
         <ol>
-          <li>Use <b>Chrome 138+</b> (see <code>chrome://version</code>) — not Chromium, which often ships without the model.</li>
-          <li>Set both flags to Enabled and relaunch:
+          <li>Check <code>chrome://version</code> — you need <b>Chrome 138 or newer</b>, and real
+              Chrome, not Chromium (Chromium usually ships with no model and only echoes input back).</li>
+          <li>Open <code>chrome://flags</code> and use its <b>search box</b> — type
+              <code>on-device</code>, then <code>prompt api</code>. Set:
             <ul>
-              <li><code>chrome://flags/#prompt-api-for-gemini-nano</code></li>
-              <li><code>chrome://flags/#optimization-guide-on-device-model</code> → <b>Enabled BypassPerfRequirement</b></li>
+              <li>“Prompt API for Gemini Nano” → <b>Enabled</b></li>
+              <li>“Enables optimization guide on device” → <b>Enabled BypassPerfRequirement</b>
+                  (not plain “Enabled”)</li>
             </ul>
-          </li>
-          <li>Open <code>chrome://on-device-internals</code> and wait for the model download (~2 GB, one time).</li>
-          <li>Reload, then click Generate — the first run may download the model.</li>
+            If a search returns nothing, your Chrome likely ships that piece enabled already —
+            move on rather than hunting for it.</li>
+          <li>Relaunch Chrome, then open <code>chrome://on-device-internals</code> to watch the
+              one-time model download (~2 GB). That page, not the flags page, is the authority on
+              whether the model is really present.</li>
+          <li>Come back here and press <b>Run check</b>.</li>
         </ol>
       </div>
     </details>
