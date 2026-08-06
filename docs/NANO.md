@@ -36,7 +36,19 @@ cp app/chart-nano.html index.html
    so creation must stay inside the Generate/check button handlers.
 4. **No speech input here.** Chrome's `webkitSpeechRecognition` sends audio to Google, which
    would be a PHI breach. Voice stays in the local whisper pipeline (`scripts/dictate.sh`).
-5. **Prompts are deliberately short.** Every character of system prompt and template is one the
+5. **Session creation is the slow part — do not add sessions.** `LanguageModel.create()` is by
+   far the most expensive call; prompting an existing session is cheap. So:
+   - one generation creates **two** sessions total (one for the whole extraction phase, one for
+     the write), never one per chunk. `runMany()` owns the extraction session;
+   - each chunk runs on `session.clone()`, which resets the conversation to the system prompt so
+     calls stay independent *without* paying for a create and *without* accumulating context
+     across chunks. `promptOn()` falls back to reusing the session if `clone` is missing;
+   - `charBudget()` measures on the session that already exists and **caches** the result for the
+     page's lifetime — it depends on the browser, not on the record. Re-measuring per Generate
+     wasted a whole session creation.
+   Earlier versions created a session per chunk plus a throwaway one for the budget (N+2 per
+   run); that is what made it feel slow. Keep it at 2.
+6. **Prompts are deliberately short.** Every character of system prompt and template is one the
    record cannot use. Keep the safety rules, cut the prose. Do not paste the long
    `templates/*.md` bodies in here — the embedded ones are intentionally condensed.
 

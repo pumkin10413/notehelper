@@ -282,36 +282,67 @@ async function createSession(systemPrompt, onPct){
   throw new Error("NO_API");
 }
 
-/* One prompt, fresh session (no cross-patient context), stub-guarded. */
-async function runOnce(systemPrompt, userPrompt, onPct){
-  const {session,systemApplied}=await createSession(systemPrompt,onPct);
+const STUB_MSG = "This browser exposes the Prompt API but has no on-device model — it echoed the "+
+  "input back instead of generating. Nothing usable was produced. Open “Model & setup check” below.";
+
+/* Run one prompt on an EXISTING session, stub-guarded.
+   Uses clone() when the browser has it: cloning resets the conversation to the initial system
+   prompt, so repeated calls neither accumulate context nor pay for a fresh create(). */
+async function promptOn(session, systemApplied, systemPrompt, userPrompt){
   const full = systemApplied ? userPrompt : (systemPrompt+"\n\n"+userPrompt);
+  let s = session, temp = false;
+  if(session.clone){ try{ s = await session.clone(); temp = true; }catch(e){ s = session; } }
   try{
-    const out=await session.prompt(full);
-    if(detectStub(full,out)) throw new Error(
-      "This browser exposes the Prompt API but has no on-device model — it echoed the input back "+
-      "instead of generating. Nothing usable was produced. Open “Model & setup check” below.");
+    const out = await s.prompt(full);
+    if(detectStub(full,out)) throw new Error(STUB_MSG);
     return String(out).trim();
-  } finally { try{ session.destroy(); }catch(e){} }
+  } finally { if(temp){ try{ s.destroy(); }catch(e){} } }
 }
 
-/* How many characters of record we dare send in one call — measured, never hardcoded. */
-async function charBudget(systemPrompt, templateText){
+/* One-shot convenience: create a session, run once, destroy. Use runMany() for several calls. */
+async function runOnce(systemPrompt, userPrompt, onPct){
+  const {session,systemApplied}=await createSession(systemPrompt,onPct);
+  try{ return await promptOn(session, systemApplied, systemPrompt, userPrompt); }
+  finally{ try{ session.destroy(); }catch(e){} }
+}
+
+/* Create ONE session and hand it to fn as a runner. Session creation is the slow part on Nano,
+   so everything in a single generation shares one session (same patient — no cross-patient
+   leakage, and clone() keeps the calls independent). */
+async function runMany(systemPrompt, fn, onPct){
+  const {session,systemApplied}=await createSession(systemPrompt,onPct);
+  const run = (userPrompt) => promptOn(session, systemApplied, systemPrompt, userPrompt);
+  try{ return await fn(run, session); }
+  finally{ try{ session.destroy(); }catch(e){} }
+}
+
+/* How many characters of record we dare send in one call — measured, never hardcoded.
+   Cached for the page's lifetime: the answer depends on the browser, not on the record, so
+   re-measuring on every Generate just wasted a session creation. */
+const _budgetCache = new Map();
+async function charBudget(systemPrompt, templateText, session){
+  const key = (systemPrompt||"").length + "/" + (templateText||"").length;
+  if(_budgetCache.has(key)) return _budgetCache.get(key);
+  let result = null, own = null;
   try{
-    const {session}=await createSession(null);
-    const win = session.contextWindow ?? session.inputQuota ?? null;
-    if(win && session.measureContextUsage){
+    let s = session;
+    if(!s){ own = await createSession(null); s = own.session; }
+    const win = s.contextWindow ?? s.inputQuota ?? null;
+    if(win && s.measureContextUsage){
       const sample="S: epigastric pain 2 weeks, BP 148/88, Hb 12.4 g/dL\n";
-      const perChar=(await session.measureContextUsage(sample))/sample.length;
-      const overhead=await session.measureContextUsage((systemPrompt||"")+(templateText||""));
-      try{ session.destroy(); }catch(e){}
+      const perChar=(await s.measureContextUsage(sample))/sample.length;
+      const overhead=await s.measureContextUsage((systemPrompt||"")+(templateText||""));
       const left = win - overhead - Math.round(win*0.45);   // reserve 45% for the answer
-      return Math.max(200, Math.floor(left/Math.max(perChar,0.05)));
+      result = Math.max(200, Math.floor(left/Math.max(perChar,0.05)));
     }
-    try{ session.destroy(); }catch(e){}
   }catch(e){}
-  const overheadChars=(systemPrompt||"").length+(templateText||"").length;
-  return Math.max(200, 2400-overheadChars);
+  finally{ if(own){ try{ own.session.destroy(); }catch(e){} } }
+  if(result==null){
+    const overheadChars=(systemPrompt||"").length+(templateText||"").length;
+    result = Math.max(200, 2400-overheadChars);
+  }
+  _budgetCache.set(key, result);
+  return result;
 }
 
 async function probeCapabilities(){
@@ -334,7 +365,8 @@ async function probeCapabilities(){
 }
 
 window.NanoCore={cleanRecord,chunkRecord,parseTimeline,mergeTimelines,renderTimeline,detectStub,
-                 probeCapabilities,getAvailability,createSession,runOnce,charBudget,toHalfWidth,byLeadingDate};
+                 probeCapabilities,getAvailability,createSession,runOnce,runMany,promptOn,
+                 charBudget,toHalfWidth,byLeadingDate,_budgetCache};
 
 /* ================================ prompts & templates ============================== */
 /* Kept SHORT on purpose: Nano's context is small, and every character here is one the
@@ -522,21 +554,28 @@ async function writeChart(tmpl, sourceText){
 async function runRaw(tmpl, rawText){
   const {cleaned,stats}=cleanRecord(rawText);
   if(!cleaned) throw new Error('Nothing left after cleaning — is the input empty or all boilerplate?');
-  setStatus('Measuring what this browser can hold…');
-  const budget=await charBudget(SYS_EXTRACT,'');
-  const chunks=chunkRecord(cleaned,budget);
-  const parts=[];
-  for(let i=0;i<chunks.length;i++){
-    setStatus(`Extracting ${i+1} of ${chunks.length} (chunk ≈${budget} chars)…`);
-    setProgress(i/(chunks.length+1));
-    const label=chunks.length>1?`RECORD PART ${i+1} OF ${chunks.length}:\n`:'RAW MEDICAL RECORD:\n';
-    parts.push(parseTimeline(await runOnce(SYS_EXTRACT, label+chunks[i])));
-  }
-  const timeline=renderTimeline(mergeTimelines(parts));
+  const t0=performance.now();
+  // ONE session for the whole extraction phase; the budget is measured on it (cached after
+  // the first run) instead of paying for a separate throwaway session.
+  const {timeline,chunkCount,budget} = await runMany(SYS_EXTRACT, async (run, session) => {
+    const budget = await charBudget(SYS_EXTRACT, '', session);
+    const chunks = chunkRecord(cleaned, budget);
+    const parts=[];
+    for(let i=0;i<chunks.length;i++){
+      setStatus(chunks.length>1
+        ? `Extracting ${i+1} of ${chunks.length}…`
+        : 'Reading the record…');
+      setProgress(i/(chunks.length+1));
+      const label=chunks.length>1?`RECORD PART ${i+1} OF ${chunks.length}:\n`:'RAW MEDICAL RECORD:\n';
+      parts.push(parseTimeline(await run(label+chunks[i])));
+    }
+    return {timeline:renderTimeline(mergeTimelines(parts)), chunkCount:chunks.length, budget};
+  });
   setStatus('Writing the chart from the timeline…');
-  setProgress(chunks.length/(chunks.length+1));
+  setProgress(chunkCount/(chunkCount+1));
   const chart=await writeChart(tmpl,timeline);
-  return {chart,timeline,stats,chunks:chunks.length,budget};
+  return {chart,timeline,stats,chunks:chunkCount,budget,
+          secs:Math.round((performance.now()-t0)/100)/10};
 }
 
 $('genBtn').onclick=async()=>{
@@ -553,12 +592,13 @@ $('genBtn').onclick=async()=>{
       $('timelineOut').value=r.timeline;
       $('tlStats').textContent=`— ${r.chunks} chunk(s), ${r.stats.dropped} noise lines removed, ${r.stats.redacted} identifiers redacted`;
       $('tlWrap').classList.remove('hidden'); $('tlWrap').open=true;
-      setStatus('Done. Check the timeline, then proofread the chart.');
+      setStatus(`Done in ${r.secs}s. Check the timeline, then proofread the chart.`);
     }else{
       setStatus('Generating on-device…');
+      const t0=performance.now();
       $('chartOut').value=await writeChart(tmpl,input);
       $('tlWrap').classList.add('hidden');
-      setStatus('Done. Proofread every line before use.');
+      setStatus(`Done in ${Math.round((performance.now()-t0)/100)/10}s. Proofread every line before use.`);
     }
   }catch(e){
     setStatus('Failed.');
