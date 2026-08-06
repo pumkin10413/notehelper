@@ -84,6 +84,22 @@ with an echo stub, so no real chart has ever been produced by this page. The fir
 it on a proper Chrome must judge whether Nano's output is good enough, and how much of a record
 fits per chunk. Expect Nano to be markedly weaker than a 7B model at following the template.
 
+## BLOCKER: Gemini Nano does not run on the hospital VDI (confirmed 2026-08-06)
+The user charts inside a **Windows virtual desktop reached through Omnissa Horizon Client** —
+that is where the EMR lives. On that VDI Chrome the page reports **"no on-device model /
+unavailable"**. Their MacBook's Chrome reports available with a 9216-token window; the two are
+different browsers on different machines, and only the Mac one works.
+
+This is almost certainly **not fixable by us**:
+- hospital-managed Chrome usually locks `chrome://flags` by enterprise policy;
+- virtual desktops have no GPU passthrough, so Nano's hardware check fails;
+- the ~2 GB model is per-profile and a non-persistent VDI profile discards it at every logoff.
+
+**Consequence: the browser/Nano page cannot be the charting tool where the charting happens.**
+Any future session that is asked to "make the Nano page work at the hospital" should say this
+plainly instead of trying flags again. The open question is not technical but organisational —
+see the decision recorded in docs/HANDOFF.md.
+
 ## If the page says the model is unavailable
 Only do this when "Run check" reports unavailable. On this user's machine it already reports
 available, so setup is done.

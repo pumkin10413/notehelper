@@ -45,6 +45,31 @@ Next session should: <one concrete goal>
 
 ---
 
+## 2026-08-06 (late) — Claude (Opus 5) — VDI blocker found: the Nano path cannot serve the real workflow
+**This entry outranks the two below it. Read it before planning any work.**
+Finding: the user charts inside a **Windows VDI (Omnissa Horizon Client)** — that is where the
+EMR is. On that VDI Chrome the page reports **no on-device model / unavailable**. The 9216-token
+success was their **MacBook's** Chrome, a different machine. Gemini Nano on a hospital VDI is
+effectively unreachable (managed-Chrome policy locks flags, no GPU passthrough, non-persistent
+profile discards the ~2 GB model). Details in docs/NANO.md → "BLOCKER".
+
+**Therefore the browser/Nano page cannot be the tool at the place the charting happens.** Do not
+spend another session on flags or on making Nano work at the hospital.
+
+The unresolved question is organisational, not technical, and only the user can answer it:
+1. Does hospital policy permit moving patient text out of the VDI onto a personal Mac at all?
+   (Horizon clipboard redirection may also simply be disabled.) This is a PHI-egress question —
+   the repo's "PHI stays local" rule was written assuming the data already lived on the Mac.
+2. If yes → charting happens on the Mac, and **Ollama beats Nano there** on every axis except
+   setup: 7B vs Nano quality, raw-OPD mode already built and eval-covered. The right move would
+   be to UN-PAUSE the Ollama path and make it one-click (Ollama already runs as a login service;
+   only `python3 app/server.py` needs wrapping).
+3. If no → no automated tool can touch real records; the honest scope shrinks to typing
+   de-identified bullets on the Mac, and the Nano page is adequate for exactly that.
+
+Status: awaiting the user's answer. Nothing was built this turn on purpose — building before
+that answer would likely be wasted work.
+
 ## 2026-08-06 — Claude (Opus 5) — Nano page becomes the primary tool; feature parity + hard safety fix
 **DIRECTION CHANGE from the user: all future work goes to the browser/Nano page. The Ollama
 stack is paused indefinitely.** Roadmap items below are rewritten accordingly.
