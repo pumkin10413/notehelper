@@ -90,15 +90,28 @@ that is where the EMR lives. On that VDI Chrome the page reports **"no on-device
 unavailable"**. Their MacBook's Chrome reports available with a 9216-token window; the two are
 different browsers on different machines, and only the Mac one works.
 
-This is almost certainly **not fixable by us**:
-- hospital-managed Chrome usually locks `chrome://flags` by enterprise policy;
-- virtual desktops have no GPU passthrough, so Nano's hardware check fails;
-- the ~2 GB model is per-profile and a non-persistent VDI profile discards it at every logoff.
+**Why is UNRESOLVED — do not repeat the earlier overclaim.** An earlier version of this file
+asserted that managed policy, missing GPU passthrough and profile wiping made it "almost
+certainly not fixable". That was inference from a single "unavailable" reading, not evidence.
+Since then the VDI Chrome was found to be **version 151.0.7922.76**, far above the 138 minimum,
+so the version hypothesis is dead and the rest are still untested.
 
-**Consequence: the browser/Nano page cannot be the charting tool where the charting happens.**
-Any future session that is asked to "make the Nano page work at the hospital" should say this
-plainly instead of trying flags again. The open question is not technical but organisational —
-see the decision recorded in docs/HANDOFF.md.
+Chrome refuses the model when ANY of these fails, and all produce the same "unavailable":
+| Requirement | Fixable by the user? |
+|---|---|
+| Chrome 138+ | **Ruled out** — VDI runs 151 |
+| Both flags on (they are OFF by default) | **Yes**, if policy allows — most likely cause |
+| > 4 GB VRAM | No — the real risk on a GPU-less virtual desktop, though "Enabled BypassPerfRequirement" is designed to relax exactly this |
+| ~22 GB free on the profile volume | No |
+| Enterprise policy permitting the local model | No — check `chrome://policy` |
+
+**Diagnose, do not guess:** `chrome://on-device-internals` on the machine in question names the
+failing criterion; `chrome://policy` shows whether IT disabled the local foundational model.
+Record the answer here when it is known.
+
+Regardless of the outcome, the page must not *depend* on Nano: the user's stated requirement is
+that it "work on almost any machine with new Chrome, even hospital Windows computers". That is
+what the built-in no-AI engine is for.
 
 ## If the page says the model is unavailable
 Only do this when "Run check" reports unavailable. On this user's machine it already reports
