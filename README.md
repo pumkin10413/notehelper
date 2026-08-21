@@ -5,15 +5,15 @@ entirely on your machine. Nothing is ever uploaded anywhere.
 
 ## Daily use — the browser page
 Open **https://pumkin10413.github.io/notehelper/** (or double-click `app/chart-nano.html`).
-Needs Chrome 138+ with the on-device model enabled; the page's **"Model & setup check"** tells
-you exactly what is missing.
 
-- Pick a chart type — **`pi`** gives just the Present Illness paragraph.
-- Tick **"Paste raw OPD record"** for multi-visit records with lab and exam reports.
-- Open **"Extracted timeline"** and check it: the chart is written only from that, and you can
-  edit it and press **Rewrite chart**.
+It does one thing: **paste bullets → get a Present Illness paragraph → Copy.**
+Open **Template** if you want to change the wording rules; your edits are saved in that browser.
 
-Full guide: [docs/NANO.md](docs/NANO.md).
+Needs Chrome 138+ with the on-device model. If it says unavailable, open **Model & setup check**
+on the page — it names what is missing. Full notes: [docs/NANO.md](docs/NANO.md).
+
+Everything else — admission notes, procedure notes, whole OPD records — lives in the Ollama
+pipeline below.
 
 ---
 

@@ -45,6 +45,39 @@ Next session should: <one concrete goal>
 
 ---
 
+## 2026-08-07 — Claude (Opus 5) — Pages deploy fixed; page simplified to bullets → Present Illness
+**Read this entry first; it supersedes the feature lists in the entries below.**
+Done:
+- **Fixed GitHub Pages.** Deploys had failed silently since 2026-08-05: the live site was frozen
+  at commit `4d2a6f0` (`last-modified` Aug 5 16:18 GMT) while four later commits never shipped,
+  so the user was testing an old page for two days. Cause: the default Jekyll build. Added
+  **`.nojekyll`** — the site is now byte-identical to the committed `index.html` (verified by
+  diff, not by grep; one earlier grep gave a false negative through case sensitivity).
+- **Simplified the page on the user's instruction** to ONE job: bullets → Present Illness,
+  following a template. Removed raw-OPD mode, chunked extraction, timeline merge, the timeline
+  panel with Rewrite, `charBudget`, and the admission/procedure/consult/progress types.
+  Kept: the editable+persisted template with Reset, the echo-stub guard, the setup check, and
+  every hallucination rule earned in testing. Internals now exposed as `window.PI`.
+- The unfinished deterministic no-AI engine is parked on branch **`wip/builtin-engine`** (it was
+  never tested; do not ship it without testing).
+- Docs realigned: `docs/NANO.md` rewritten for the simplified page (stale `charBudget`/`NanoCore`
+  references removed), README and CLAUDE.md updated, VDI facts recorded honestly.
+Verified (Chromium test browser, page logic only): loads with no script errors; removed features
+genuinely absent; template panel empty→built-in, Reset→built-in, edits persist, custom overrides;
+stub guard catches an echo and does not false-positive on real prose.
+Not done / broken:
+- **Real Nano has still never generated a Present Illness.** The test browser here is an echo
+  stub. Output quality is unmeasured — do not claim the page works well until the user reads one.
+- **Hospital VDI still has no model.** Facts so far: Chrome 151 (version ruled out),
+  `chrome://policy` clean (no GenAI block), Prompt API flag Enabled **but relaunch not yet done**,
+  `on-device-internals` says "device performance class: error". The optimization-guide flag that
+  older guides mention **does not exist in Chrome 151**. Untried: the relaunch, and
+  `#on-device-model-litert-lm-backend` (LiteRT-LM runs on CPU, which may suit a GPU-less VDI).
+Next session should: (1) ask whether the VDI relaunch made the model appear; (2) get ONE real
+Present Illness out of the page on a working Chrome and paste it into this log, judging whether
+Nano keeps the template, keeps every value, and avoids the five hallucination classes. Do not add
+features to the page — the user asked for it small.
+
 ## 2026-08-06 (late) — Claude (Opus 5) — VDI blocker found: the Nano path cannot serve the real workflow
 **This entry outranks the two below it. Read it before planning any work.**
 Finding: the user charts inside a **Windows VDI (Omnissa Horizon Client)** — that is where the

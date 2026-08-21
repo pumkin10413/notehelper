@@ -20,7 +20,7 @@ Voice → text via whisper.cpp; bullets → formatted chart via Ollama. **No pat
 | Chart templates | [templates/](templates/README.md) |
 | LLM prompts (bullets→chart) | [prompts/](prompts/README.md) |
 | CLI tools | [scripts/](docs/ARCHITECTURE.md) — `chart.py`, `dictate.sh`, `voice-chart.sh`, `doctor.sh` |
-| **Primary tool** — on-device browser page (no server) | `app/chart-nano.html`, published copy `index.html` — see [docs/NANO.md](docs/NANO.md) |
+| **Primary tool** — browser page, bullets → Present Illness only | `app/chart-nano.html`, published copy `index.html` — see [docs/NANO.md](docs/NANO.md) |
 | Ollama web app (**not being developed** — user paused this path 2026-08-06) | `app/server.py` → http://127.0.0.1:8765 |
 | Regression tests for prompts | [eval/](eval/README.md) |
 | De-identified real samples | `samples/` (user adds; follow PHI-SAFETY checklist) |
@@ -28,8 +28,10 @@ Voice → text via whisper.cpp; bullets → formatted chart via Ollama. **No pat
 
 ## Current direction (read before planning work)
 The user works in the **browser page** (`app/chart-nano.html` / hosted `index.html`), not the
-Ollama stack. Put new effort there. The Ollama pipeline still works and its prompts/templates
-remain the reference wording, but do not build new features on it unless asked.
+Ollama stack. That page was deliberately simplified on 2026-08-07 to do ONE job: bullets →
+Present Illness. **Do not add features to it unless asked** — raw-OPD parsing, other chart
+types and the timeline panel were all removed on purpose (they still exist in the Ollama
+pipeline, and an unfinished no-AI engine is parked on branch `wip/builtin-engine`).
 **After editing `app/chart-nano.html`, run `cp app/chart-nano.html index.html`** or the hosted
 page goes stale.
 

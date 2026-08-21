@@ -3,22 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chart Assistant — on-device</title>
+<title>Present Illness Assistant</title>
 <!--
-  SELF-CONTAINED on-device charting page. Primary tool for this project.
-  Runs bullets/dictated text, or a whole pasted OPD record, into a formatted English chart
-  using Chrome's built-in on-device Gemini Nano (Prompt API). No server, no network calls,
-  no external scripts. The only thing Chrome fetches is the Nano model binary (one time).
+  ONE JOB: bullet points -> a Present Illness paragraph, following a template.
+  Self-contained single file. No server, no network calls, no external scripts. Generation
+  runs on Chrome's built-in on-device Gemini Nano (Prompt API), so the bullets never leave
+  the machine. The only thing Chrome ever fetches is the model binary itself, one time.
 
-  KEY CONSTRAINTS (measured 2026-08-06, see docs/NANO.md):
-  - Nano's context window is SMALL and differs between Chrome builds. NOTHING here hardcodes
-    a size: budgets come from session.contextWindow + measureContextUsage() at runtime, so a
-    long record is split into as many chunks as that browser actually needs.
-  - Some Chromium builds expose the Prompt API with NO model and simply echo the prompt back.
-    Echoed input must never be shown as a chart, so detectStub() catches it and raises.
-  - Deliberately NO speech input: Chrome's webkitSpeechRecognition sends audio to Google.
-    Voice stays in the local whisper pipeline (scripts/dictate.sh).
-  Internals are exposed as window.NanoCore so they can be tested from the console.
+  Deliberately NOT here (removed 2026-08-07 to keep this simple — see docs/NANO.md):
+  raw multi-visit OPD parsing, chunked extraction, the timeline panel, and the other chart
+  types. The Ollama pipeline in this repo still does those if they are ever needed again;
+  an unfinished no-AI engine is parked on branch wip/builtin-engine.
+
+  Two guards that must NOT be removed:
+  - detectStub(): some Chromium builds expose the Prompt API with no model and echo the
+    prompt straight back. Showing that as a chart would put the physician's own input into
+    a record as if it were generated output.
+  - No speech input: Chrome's webkitSpeechRecognition uploads audio to Google (PHI breach).
 -->
 <style>
   :root { --bg:#f6f7f9; --card:#fff; --ink:#1a1d21; --accent:#7c3aed; --border:#d7dbe0; }
@@ -31,11 +32,10 @@
   @media (max-width:820px){ main { grid-template-columns:1fr; } }
   .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:10px; }
   label { font-weight:600; font-size:13px; }
-  select, textarea { width:100%; font:inherit; border:1px solid var(--border); border-radius:8px; padding:8px; }
-  textarea { min-height:230px; resize:vertical; }
-  #customTmpl { min-height:140px; font-family:ui-monospace,Menlo,monospace; font-size:12px; }
-  #chartOut { min-height:300px; white-space:pre-wrap; font-family:ui-monospace,Menlo,monospace; font-size:13px; }
-  #timelineOut { min-height:200px; font-family:ui-monospace,Menlo,monospace; font-size:12px; }
+  textarea { width:100%; font:inherit; border:1px solid var(--border); border-radius:8px; padding:8px; }
+  #bullets { min-height:300px; resize:vertical; }
+  #out { min-height:340px; white-space:pre-wrap; resize:vertical; }
+  #customTmpl { min-height:160px; font-family:ui-monospace,Menlo,monospace; font-size:12px; }
   .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   button { font:inherit; font-weight:600; border:0; border-radius:8px; padding:9px 16px; cursor:pointer; background:var(--accent); color:#fff; }
   button.secondary { background:#e7eaee; color:var(--ink); }
@@ -46,91 +46,70 @@
   details { font-size:13px; border:1px solid var(--border); border-radius:8px; padding:8px 12px; background:#fff; }
   details summary { cursor:pointer; font-weight:600; }
   details code { background:#f0f0f4; padding:1px 4px; border-radius:4px; }
-  .rawtoggle { display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; }
-  .rawtoggle span { font-weight:400; color:#666; font-size:12px; }
   .muted { font-weight:400; color:#666; font-size:12px; }
-  progress { width:100%; height:6px; }
   .hidden { display:none; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Chart Assistant</h1>
-  <span class="badge">on-device — nothing leaves this Mac</span>
+  <h1>Present Illness Assistant</h1>
+  <span class="badge">on-device — nothing leaves this computer</span>
   <span id="status">Checking for the on-device model…</span>
 </header>
 
 <main>
   <section class="card">
-    <div class="row">
-      <label for="tmpl">Chart type</label>
-      <select id="tmpl"></select>
-    </div>
-    <div id="customWrap" class="hidden">
-      <label for="customTmpl">Custom template (saved in this browser)</label>
-      <textarea id="customTmpl" placeholder="NAME: My format&#10;Output only ... &#10;RULES: never invent values ..."></textarea>
-    </div>
-    <label class="rawtoggle"><input type="checkbox" id="rawMode"> Paste raw OPD record
-      <span>— multiple visits + lab/exam reports. Cleans it, extracts a timeline in chunks, then writes.</span>
-    </label>
-    <label for="bullets">Bullets / OPD record</label>
-    <textarea id="bullets" placeholder="65M, DM type 2 / HTN
+    <label for="bullets">Bullets</label>
+    <textarea id="bullets" placeholder="65M, DM type 2 since 2016, HTN since 2014
 fever and productive cough 3 days
-RUL crackles, SpO2 94% RA
+no chest pain, no hemoptysis
+RUL crackles, SpO2 94% on room air
 CXR: RUL consolidation
-WBC 14.2, CRP 8.5
-imp: CAP
-plan: admit, blood culture x2, ceftriaxone"></textarea>
-    <progress id="prog" class="hidden" max="100" value="0"></progress>
+WBC 14200, CRP 8.5
+imp: community acquired pneumonia
+admitted for further management"></textarea>
     <div class="row">
-      <button id="genBtn" type="button" disabled>Generate chart</button>
+      <button id="genBtn" type="button" disabled>Write Present Illness</button>
       <button id="clearBtn" class="secondary" type="button">Clear</button>
     </div>
+    <details id="tmplWrap">
+      <summary>Template <span class="muted">— edit the wording rules</span></summary>
+      <p class="muted" style="margin:8px 0">Saved in this browser only. Leave it empty to use the
+        built-in one. Press “Reset” to bring the built-in text back and edit from there.</p>
+      <textarea id="customTmpl" placeholder="(empty = use the built-in template)"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button id="resetTmplBtn" class="secondary" type="button">Reset to built-in</button>
+      </div>
+    </details>
   </section>
 
   <section class="card">
     <div class="row" style="justify-content:space-between">
-      <label for="chartOut">Generated chart</label>
+      <label for="out">Present Illness</label>
       <button id="copyBtn" class="secondary" type="button">Copy</button>
     </div>
     <div id="errBox" class="err hidden"></div>
-    <textarea id="chartOut" spellcheck="false"></textarea>
+    <textarea id="out" spellcheck="false"></textarea>
     <div class="warn">AI-drafted by a small on-device model. <b>Read every line before pasting into the medical record</b> — you are the author of the chart.</div>
-
-    <details id="tlWrap" class="hidden">
-      <summary>Extracted timeline <span id="tlStats" class="muted"></span></summary>
-      <div class="warn" style="margin:8px 0">Check this first. The chart is written <b>only</b> from this timeline, so anything missing or wrong here is missing or wrong in the chart. You can edit it and press Rewrite.</div>
-      <textarea id="timelineOut" spellcheck="false"></textarea>
-      <div class="row"><button id="rewriteBtn" class="secondary" type="button">Rewrite chart from this timeline</button></div>
-    </details>
 
     <details id="diag">
       <summary>Model &amp; setup check</summary>
       <div class="row" style="margin-top:8px"><button id="testBtn" class="secondary" type="button">Run check</button></div>
       <pre id="diagOut" class="muted" style="white-space:pre-wrap"></pre>
-      <div id="help">
-        <p><b>Only needed if the check above says the model is unavailable.</b> If it reports
-        “available” with no stub, you are already set up — ignore this section.</p>
-        <p class="muted">Chrome blocks web pages from linking to <code>chrome://</code> addresses, so
-        <b>copy each one into the address bar</b>. Don't use a <code>#flag-name</code> deep link:
-        it only jumps to the flag if that exact ID exists in your build, and does nothing at all
-        when the flag has been renamed or already ships enabled — which looks like a broken link.</p>
+      <div class="muted">
+        <p><b>Only needed if the check says unavailable.</b> Chrome blocks pages from linking to
+          <code>chrome://</code> addresses, so paste each into the address bar. Avoid
+          <code>#flag-name</code> deep links — they do nothing when a flag was renamed or already
+          ships on, which looks like a broken link.</p>
         <ol>
-          <li>Check <code>chrome://version</code> — you need <b>Chrome 138 or newer</b>, and real
-              Chrome, not Chromium (Chromium usually ships with no model and only echoes input back).</li>
-          <li>Open <code>chrome://flags</code> and use its <b>search box</b> — type
-              <code>on-device</code>, then <code>prompt api</code>. Set:
-            <ul>
-              <li>“Prompt API for Gemini Nano” → <b>Enabled</b></li>
-              <li>“Enables optimization guide on device” → <b>Enabled BypassPerfRequirement</b>
-                  (not plain “Enabled”)</li>
-            </ul>
-            If a search returns nothing, your Chrome likely ships that piece enabled already —
-            move on rather than hunting for it.</li>
-          <li>Relaunch Chrome, then open <code>chrome://on-device-internals</code> to watch the
-              one-time model download (~2 GB). That page, not the flags page, is the authority on
-              whether the model is really present.</li>
-          <li>Come back here and press <b>Run check</b>.</li>
+          <li><code>chrome://version</code> — need <b>Chrome 138+</b>, and real Chrome. Chromium
+              usually has no model and only echoes input back.</li>
+          <li><code>chrome://flags</code> → search <code>prompt api</code> → “Prompt API” =
+              <b>Enabled</b>, then <b>relaunch</b> (the change only applies after relaunch).</li>
+          <li><code>chrome://on-device-internals</code> — the authority on whether the model is
+              really present, and it names the failing requirement. “Device performance class:
+              error” is common on virtual desktops with no GPU.</li>
+          <li><code>chrome://policy</code> → search <code>GenAI</code> if you suspect IT blocked it.</li>
         </ol>
       </div>
     </details>
@@ -141,522 +120,186 @@ plan: admit, blood culture x2, ceftriaxone"></textarea>
 "use strict";
 const $ = id => document.getElementById(id);
 const setStatus = m => { $('status').textContent = m; };
-const showErr = m => { const b=$('errBox'); if(!m){b.classList.add('hidden');b.textContent='';return;} b.textContent=m; b.classList.remove('hidden'); };
+const showErr = m => { const b=$('errBox');
+  if(!m){ b.classList.add('hidden'); b.textContent=''; return; }
+  b.textContent = m; b.classList.remove('hidden'); };
 
-/* ============================ NanoCore: logic, testable ============================ */
-const NOISE_RE = [
-  /^[-=_*~#─━═╌┄┈≡.]{3,}$/,
-  /^page\s*\d+(\s*(of|\/)\s*\d+)?$/i,
-  /^第\s*\d+\s*[頁页].*$/,
-  /^(printed|print date|列印日期|列印時間)\b.*$/i,
-  /^\s*\d{1,3}\s*$/,
-  /^(confidential|機密).*$/i,
-];
-const ID_LABELS = "(?:patient\\s*name|name|chart\\s*(?:no|number)|medical\\s*record\\s*(?:no|number)|mrn|national\\s*id|姓\\s*名|病歷號(?:碼)?|身分證(?:字號)?|身份證(?:字號)?|病人姓名)";
-const ID_LINE_RE = new RegExp("^\\s*" + ID_LABELS + "\\s*[:：]\\s*\\S.*$", "i");
-const TW_ID_RE = /\b[A-Za-z][12]\d{8}\b/g;
+/* ------------------------------ the template ------------------------------------- */
+/* Every rule below was added because a real model made that exact mistake during
+   testing. Keep them when editing: they are the difference between a draft you can
+   trust and one you must fact-check line by line. */
+const BUILTIN_TEMPLATE = `Write ONLY the Present Illness narrative in English prose, ready to paste into the Present Illness field. No headings, no "Present Illness:" label, no chief complaint, no past history list, no impression, no plan. Begin with the word "This".
 
-function toHalfWidth(t){ let o=""; for(const ch of t){ const c=ch.codePointAt(0);
-  o += c===0x3000 ? " " : (c>=0xFF01&&c<=0xFF5E) ? String.fromCodePoint(c-0xFEE0) : ch; } return o; }
+OPENING SENTENCE:
+"This [age]-year-old [man/woman] with underlying [EVERY chronic disease in the bullets, most relevant first, keeping the year exactly as written] presented with [first symptom and its duration]."
+Search all of the bullets for chronic diseases before writing — missing one is the most common error. If none are given, write "no known systemic disease".
+If the age is not given, write "This patient" and never a number. If the sex is not given, do not write "man" or "woman". Never guess either.
 
-function cleanRecord(text){
-  const linesIn = text.split(/\r?\n/).length;
-  text = toHalfWidth(text).replace(/\t/g," ").replace(/ /g," ").replace(/[​-‏﻿]/g,"");
-  let dropped=0, redacted=0; const kept=[];
-  for(const line of text.split(/\r?\n/)){
-    const s=line.trim();
-    if(!s){ kept.push(""); continue; }
-    if(NOISE_RE.some(rx=>rx.test(s))){ dropped++; continue; }
-    if(ID_LINE_RE.test(s)){ dropped++; redacted++; continue; }
-    const before=s;
-    const out=s.replace(TW_ID_RE,"[redacted]");
-    if(out!==before) redacted++;
-    kept.push(out.replace(/ {2,}/g," "));
-  }
-  const cleaned = kept.join("\n").replace(/\n{3,}/g,"\n\n").trim();
-  return { cleaned, stats:{ linesIn, linesOut: cleaned.split("\n").filter(l=>l.trim()).length,
-           dropped, redacted, charsIn:text.length, charsOut:cleaned.length } };
-}
+BODY, in chronological order:
+- how each symptom began and changed: onset, character, severity, timing, what made it better or worse
+- the pertinent negatives the bullets state ("denied chest pain")
+- examination findings
+- every laboratory value with its unit, and every study with its findings, written inside sentences: "...laboratory studies showed a white blood cell count of 14200 and C-reactive protein of 8.5."
+- treatment already given and the response to it
+Include EVERY value in the bullets, including ones that look unrelated to the main complaint. Never gather values into a list, and never write "Laboratory results included:" or any similar collecting phrase.
 
-const BOUNDARY_RE = /^(\[?\s*(OPD|ER|ADM|VISIT)\b|\[?\s*\d{4}[-/]\d{1,2}[-/]\d{1,2}|LAB(ORATORY)?\b|COLLECTED\b|STUDY\s*:|EXAM(INATION)?\s*REPORT|PAST\s+HISTORY)/i;
+CLOSING:
+Only if the bullets state what actually happened, end with: "Under the impression of [diagnosis], the patient was [admitted / referred] for further evaluation and management."
+If the bullets state no such outcome, write no closing sentence — simply end at the last fact given. Never invent an admission or referral to round the story off.
 
-function chunkRecord(text, maxChars){
-  const chunks=[]; let cur=[];
-  const flush=()=>{ const t=cur.join("\n").trim(); if(t) chunks.push(t); cur=[]; };
-  for(const line of text.split("\n")){
-    const curLen=cur.join("\n").length;
-    const startsNew=BOUNDARY_RE.test(line.trim());
-    if(cur.length && ((startsNew && curLen>maxChars*0.5) || curLen+line.length>maxChars)) flush();
-    cur.push(line);
-  }
-  flush();
-  const out=[];
-  for(const c of chunks){
-    if(c.length<=maxChars){ out.push(c); continue; }
-    for(let i=0;i<c.length;i+=maxChars) out.push(c.slice(i,i+maxChars));
-  }
-  return out;
-}
+RULES:
+- Never invent a value, date, dose, finding, age, sex, diagnosis or outcome. Every clinical fact must come from the bullets.
+- Never do arithmetic. "DM since 2016" stays "since 2016" — never "for 10 years". A number you calculated is an invented number.
+- "r/o X" means X is SUSPECTED, never that X was ruled out. "s/p X" means X already happened. "(+)" is present, "(-)" is absent.
+- Never turn a symptom into a diagnosis the bullets did not state.
+- Write "the patient". Never output a name or chart number.
+- Prose only. No bullet points, no numbered lines, anywhere.`;
 
-const BULLETS=["TIMELINE","LABS","STUDIES"];
-const LISTS=["UNDERLYING","MEDICATIONS","NEGATIVES","UNCLEAR"];
-const FIELDS=["DEMOGRAPHICS","UNDERLYING","ALLERGY","MEDICATIONS","TIMELINE","LABS","STUDIES","NEGATIVES","DISPOSITION","UNCLEAR"];
-const isEmptyVal = v => !v || /^(not stated|none|nil|n\/a|unknown)$/i.test(String(v).trim());
+const SYSTEM_PROMPT = `You turn a physician's rough bullet points into a Present Illness paragraph, following the TEMPLATE exactly. Output only the paragraph text: no preamble, no explanation, no markdown fences. If the bullets contain no usable clinical information, output exactly: NO INPUT PROVIDED`;
 
-function parseTimeline(text){
-  const res={}; FIELDS.forEach(f=>res[f]=BULLETS.includes(f)?[]:"");
-  let cur=null;
-  for(const raw of String(text).split("\n")){
-    const line=raw.trim(); if(!line) continue;
-    const m=line.match(/^([A-Z]+)\s*:\s*(.*)$/);
-    if(m && FIELDS.includes(m[1])){ cur=m[1]; if(!BULLETS.includes(cur)) res[cur]=m[2].trim(); continue; }
-    if(cur && BULLETS.includes(cur) && /^[-*]/.test(line)) res[cur].push(line.replace(/^[-*]\s*/,""));
-  }
-  return res;
-}
+/* ------------------------------ Nano plumbing ------------------------------------ */
+const STUB_MSG = "This browser exposes the Prompt API but has no on-device model — it echoed the "+
+  "input back instead of writing anything. Open “Model & setup check” below.";
 
-function byLeadingDate(a,b){
-  const d=s=>{ const m=String(s).match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-    return m ? (+m[1])*10000+(+m[2])*100+(+m[3]) : Infinity; };
-  return d(a)-d(b);
-}
-const dedupe = arr => { const seen=new Set(), out=[];
-  for(const i of arr){ const k=String(i).toLowerCase().replace(/\s+/g," ").trim();
-    if(k && !seen.has(k)){ seen.add(k); out.push(i); } } return out; };
-
-function mergeTimelines(parts){
-  const acc={}; FIELDS.forEach(f=>acc[f]=BULLETS.includes(f)?[]:"");
-  const bag={}; LISTS.forEach(f=>bag[f]=[]);
-  for(const p of parts){
-    for(const f of FIELDS){
-      if(BULLETS.includes(f)){ acc[f].push(...p[f]); continue; }
-      if(LISTS.includes(f)){ if(!isEmptyVal(p[f])) bag[f].push(...String(p[f]).split(/;|，|、/).map(s=>s.trim()).filter(Boolean)); continue; }
-      if(!isEmptyVal(p[f])){ if(f==="DISPOSITION" || isEmptyVal(acc[f])) acc[f]=p[f]; }
-    }
-  }
-  LISTS.forEach(f=>acc[f]=dedupe(bag[f]).join("; "));
-  BULLETS.forEach(f=>acc[f]=dedupe(acc[f]).sort(byLeadingDate));
-  FIELDS.forEach(f=>{ if(!BULLETS.includes(f) && !acc[f]) acc[f]="not stated"; });
-  return acc;
-}
-
-function renderTimeline(t){
-  const out=[];
-  for(const f of FIELDS){
-    if(BULLETS.includes(f)){ out.push(f+":"); t[f].forEach(i=>out.push("- "+i)); }
-    else out.push(f+": "+t[f]);
-  }
-  return out.join("\n");
-}
-
-/* Some Chromium builds expose the API with no model and echo the prompt back. Never show
-   that as a chart. */
+/* Some Chromium builds echo the prompt back verbatim. That must never reach the output box. */
 function detectStub(promptText, output){
   if(!output) return false;
   if(/on-device model is not available|just echoing back the input/i.test(output)) return true;
-  const norm=s=>String(s).replace(/\s+/g," ").trim();
-  const o=norm(output), p=norm(promptText);
-  return o.length>40 && p.includes(o.slice(0, Math.min(120,o.length)));
+  const norm = s => String(s).replace(/\s+/g,' ').trim();
+  const o = norm(output), p = norm(promptText);
+  return o.length > 40 && p.includes(o.slice(0, Math.min(120, o.length)));
 }
 
 async function getAvailability(){
   try{
     if(self.LanguageModel && LanguageModel.availability) return await LanguageModel.availability();
-    const ns=self.ai&&(self.ai.languageModel||self.ai.assistant);
-    if(ns&&ns.capabilities){ const c=await ns.capabilities();
-      return ({no:"unavailable","after-download":"downloadable",readily:"available"})[c.available]||c.available; }
-    if(self.ai&&self.ai.createTextSession) return "available";
+    const ns = self.ai && (self.ai.languageModel || self.ai.assistant);
+    if(ns && ns.capabilities){
+      const c = await ns.capabilities();
+      return ({no:"unavailable","after-download":"downloadable",readily:"available"})[c.available] || c.available;
+    }
+    if(self.ai && self.ai.createTextSession) return "available";
   }catch(e){}
   return "no-api";
 }
 
-function monitorFn(onPct){ return m=>m.addEventListener("downloadprogress",e=>{
-  onPct && onPct(e.total ? e.loaded/e.total : e.loaded); }); }
-
+/* Defensive across Chrome versions: the Prompt API has changed shape several times. */
 async function createSession(systemPrompt, onPct){
-  const monitor=monitorFn(onPct);
+  const monitor = m => m.addEventListener("downloadprogress", e => {
+    onPct && onPct(e.total ? e.loaded/e.total : e.loaded); });
   if(self.LanguageModel && LanguageModel.create){
-    const base={monitor};
-    if(systemPrompt) base.initialPrompts=[{role:"system",content:systemPrompt}];
-    try{ return {session:await LanguageModel.create(base), systemApplied:!!systemPrompt}; }
+    const base = { monitor };
+    if(systemPrompt) base.initialPrompts = [{role:"system", content:systemPrompt}];
+    try{ return { session: await LanguageModel.create(base), systemApplied: !!systemPrompt }; }
     catch(e){
-      try{ return {session:await LanguageModel.create({systemPrompt,monitor}), systemApplied:!!systemPrompt}; }
-      catch(e2){ return {session:await LanguageModel.create({monitor}), systemApplied:false}; }
+      try{ return { session: await LanguageModel.create({systemPrompt, monitor}), systemApplied: !!systemPrompt }; }
+      catch(e2){ return { session: await LanguageModel.create({monitor}), systemApplied: false }; }
     }
   }
-  const ns=self.ai&&(self.ai.languageModel||self.ai.assistant);
-  if(ns&&ns.create){
-    try{ return {session:await ns.create({systemPrompt,monitor}), systemApplied:!!systemPrompt}; }
-    catch(e){ return {session:await ns.create({systemPrompt}), systemApplied:!!systemPrompt}; }
+  const ns = self.ai && (self.ai.languageModel || self.ai.assistant);
+  if(ns && ns.create){
+    try{ return { session: await ns.create({systemPrompt, monitor}), systemApplied: !!systemPrompt }; }
+    catch(e){ return { session: await ns.create({systemPrompt}), systemApplied: !!systemPrompt }; }
   }
-  if(self.ai&&self.ai.createTextSession) return {session:await self.ai.createTextSession(), systemApplied:false};
-  throw new Error("NO_API");
+  if(self.ai && self.ai.createTextSession) return { session: await self.ai.createTextSession(), systemApplied:false };
+  throw new Error("This browser has no Prompt API. Open “Model & setup check” below.");
 }
 
-const STUB_MSG = "This browser exposes the Prompt API but has no on-device model — it echoed the "+
-  "input back instead of generating. Nothing usable was produced. Open “Model & setup check” below.";
-
-/* Run one prompt on an EXISTING session, stub-guarded.
-   Uses clone() when the browser has it: cloning resets the conversation to the initial system
-   prompt, so repeated calls neither accumulate context nor pay for a fresh create(). */
-async function promptOn(session, systemApplied, systemPrompt, userPrompt){
-  const full = systemApplied ? userPrompt : (systemPrompt+"\n\n"+userPrompt);
-  let s = session, temp = false;
-  if(session.clone){ try{ s = await session.clone(); temp = true; }catch(e){ s = session; } }
+/* A fresh session per run: no context carries over from the previous patient. */
+async function writePI(template, bullets, onPct){
+  const { session, systemApplied } = await createSession(SYSTEM_PROMPT, onPct);
+  const user = `TEMPLATE:\n${template}\n\nBULLETS:\n${bullets.trim()}`;
+  const full = systemApplied ? user : (SYSTEM_PROMPT + "\n\n" + user);
   try{
-    const out = await s.prompt(full);
-    if(detectStub(full,out)) throw new Error(STUB_MSG);
+    const out = await session.prompt(full);
+    if(detectStub(full, out)) throw new Error(STUB_MSG);
     return String(out).trim();
-  } finally { if(temp){ try{ s.destroy(); }catch(e){} } }
+  } finally { try{ session.destroy(); }catch(e){} }
 }
 
-/* One-shot convenience: create a session, run once, destroy. Use runMany() for several calls. */
-async function runOnce(systemPrompt, userPrompt, onPct){
-  const {session,systemApplied}=await createSession(systemPrompt,onPct);
-  try{ return await promptOn(session, systemApplied, systemPrompt, userPrompt); }
-  finally{ try{ session.destroy(); }catch(e){} }
-}
-
-/* Create ONE session and hand it to fn as a runner. Session creation is the slow part on Nano,
-   so everything in a single generation shares one session (same patient — no cross-patient
-   leakage, and clone() keeps the calls independent). */
-async function runMany(systemPrompt, fn, onPct){
-  const {session,systemApplied}=await createSession(systemPrompt,onPct);
-  const run = (userPrompt) => promptOn(session, systemApplied, systemPrompt, userPrompt);
-  try{ return await fn(run, session); }
-  finally{ try{ session.destroy(); }catch(e){} }
-}
-
-/* How many characters of record we dare send in one call — measured, never hardcoded.
-   Cached for the page's lifetime: the answer depends on the browser, not on the record, so
-   re-measuring on every Generate just wasted a session creation. */
-const _budgetCache = new Map();
-async function charBudget(systemPrompt, templateText, session){
-  const key = (systemPrompt||"").length + "/" + (templateText||"").length;
-  if(_budgetCache.has(key)) return _budgetCache.get(key);
-  let result = null, own = null;
-  try{
-    let s = session;
-    if(!s){ own = await createSession(null); s = own.session; }
-    const win = s.contextWindow ?? s.inputQuota ?? null;
-    if(win && s.measureContextUsage){
-      const sample="S: epigastric pain 2 weeks, BP 148/88, Hb 12.4 g/dL\n";
-      const perChar=(await s.measureContextUsage(sample))/sample.length;
-      const overhead=await s.measureContextUsage((systemPrompt||"")+(templateText||""));
-      const left = win - overhead - Math.round(win*0.45);   // reserve 45% for the answer
-      result = Math.max(200, Math.floor(left/Math.max(perChar,0.05)));
-    }
-  }catch(e){}
-  finally{ if(own){ try{ own.session.destroy(); }catch(e){} } }
-  if(result==null){
-    const overheadChars=(systemPrompt||"").length+(templateText||"").length;
-    result = Math.max(200, 2400-overheadChars);
-  }
-  _budgetCache.set(key, result);
-  return result;
-}
-
-async function probeCapabilities(){
-  const r={api:null,availability:null,contextWindow:null,stub:null,sample:null,error:null};
-  try{
-    if(self.LanguageModel) r.api="LanguageModel";
-    else if(self.ai&&(self.ai.languageModel||self.ai.assistant)) r.api="window.ai";
-    else if(self.ai&&self.ai.createTextSession) r.api="legacy window.ai";
-    else { r.error="No Prompt API in this browser."; return r; }
-    r.availability=await getAvailability();
-    if(r.availability!=="available") return r;
-    const {session}=await createSession("Reply with the single word: ok");
-    r.contextWindow = session.contextWindow ?? session.inputQuota ?? "not reported";
-    const probe="Reply with the single word: ok";
-    let out=""; try{ out=await session.prompt(probe); }catch(e){ r.error=String(e); }
-    r.stub=detectStub(probe,out); r.sample=String(out).slice(0,90);
-    try{ session.destroy(); }catch(e){}
-  }catch(e){ r.error=String(e); }
-  return r;
-}
-
-window.NanoCore={cleanRecord,chunkRecord,parseTimeline,mergeTimelines,renderTimeline,detectStub,
-                 probeCapabilities,getAvailability,createSession,runOnce,runMany,promptOn,
-                 charBudget,toHalfWidth,byLeadingDate,_budgetCache};
-
-/* ================================ prompts & templates ============================== */
-/* Kept SHORT on purpose: Nano's context is small, and every character here is one the
-   record cannot use. Safety rules stay; prose is trimmed. */
-const SYS_CHART = `Convert the physician's input into a formatted English hospital chart following the TEMPLATE exactly.
-Output ONLY the chart text: no preamble, no explanation, no markdown fences.
-Reproduce the template's headings, order and fixed phrases. Fill [slots] only from the input; delete any line marked "/ omit" whose information is absent.
-NEVER invent a value, date, dose, finding, age, sex, diagnosis or disposition. Every clinical fact must come from the input or be fixed template text.
-NEVER do arithmetic: keep "since 2018" as "since 2018", never "4 years". A number you calculated is an invented number.
-"r/o X" means X is SUSPECTED, never that X was ruled out. "s/p X" means X already happened. "(+)"=present, "(-)"=absent.
-Never output a patient name or chart number; write "the patient".
-If the input has no usable clinical information, output exactly: NO INPUT PROVIDED`;
-
-const SYS_EXTRACT = `Extract data from a raw medical record part. Do NOT write prose. Output ONLY this structure, these headings, in this order:
-DEMOGRAPHICS: [age]-year-old [man/woman] (or "not stated")
-UNDERLYING: chronic diagnoses, "; " separated, keeping the year exactly as written
-ALLERGY: allergies, "NKDA", or "not stated"
-MEDICATIONS: long-term drugs with dose, "; " separated
-TIMELINE:
-- [date | visit] what was reported; what was found; what was done
-LABS:
-- [date] test value unit (H/L only if the record prints it); ...
-STUDIES:
-- [date | study] findings
-NEGATIVES: things explicitly denied/absent, "; " separated
-DISPOSITION: what actually happened (admitted / ER / continue outpatient follow-up / not stated). A conditional plan like "admit if Hb low" is NOT a disposition.
-UNCLEAR: contradictions or unreadable items, or "none"
-RULES: copy numbers, units, doses and dates EXACTLY. Never do arithmetic and never compute a duration from a year. Copy H/L flags only where printed; never add one. Include EVERY lab on a date, including HbA1c and renal values. "r/o X" = X suspected, never ruled out. Never output a name or chart number. If a field is absent write "not stated".`;
-
-const TEMPLATES = {
-pi:`NAME: Present Illness only
-Output ONLY the Present Illness narrative in English prose, ready to paste into the Present Illness field of an admission note. No headings, no "Present Illness:" label, no chief complaint, no past-history list, no impression, no plan. Your first word is "This".
-
-OPENING SENTENCE:
-"This [age]-year-old [man/woman] with underlying [EVERY chronic diagnosis in the input, most clinically relevant first, each keeping the year exactly as the input words it] [has been followed up at our outpatient department for [condition] / was relatively well] until [onset time], when [first symptom] developed."
-Scan the WHOLE input for chronic diagnoses first — they hide in past-history sections, problem lists and old visit notes, and missing one is the most common failure here. If the input states no chronic disease, write "no known systemic disease".
-If age is not stated, write "This patient" and never a number. If sex is not stated, do not write "man" or "woman". Never infer either from context or from a diagnosis.
-
-BODY — one paragraph per date, in strict chronological order. Each paragraph states, in its own sentences, what belongs to THAT date:
-- what the patient reported, and how each symptom changed since the previous visit (onset, character, severity, timing, aggravating/relieving factors, better or worse after treatment)
-- what was found on examination
-- what was done: drug started or adjusted (dose only if stated), study ordered, referral
-- every laboratory value from that date, with its unit, written inside a sentence: "...laboratory studies showed a hemoglobin of 8.9 g/dL, blood urea nitrogen 28 mg/dL, and creatinine 1.6 mg/dL."
-- every study from that date with its reported findings
-- the pertinent negatives the input explicitly records
-Include EVERY laboratory value and study finding in the input, including chronic-disease values that look unrelated to the complaint (HbA1c, creatinine, eGFR, lipids). Length is fine; omission is not.
-Never gather values from several dates into one summary sentence or block. Never write a list, a bullet, a numbered line, or any collecting phrase such as "Laboratory results included:", "Studies included:" or "Labs:". If a value belongs to a date you already described, add it to that existing sentence.
-
-CLOSING — conditional:
-Only if the input states a disposition that actually happened, write: "Therefore, the patient [the input's own wording] for further evaluation and management."
-If the input states no disposition, or only continued outpatient follow-up, write NO closing sentence — end at the last recorded event. Never manufacture an admission, an emergency department visit or a referral to round the story off.
-
-RULES: never invent a value, date, dose, finding, age, sex, diagnosis or disposition. Never do arithmetic — "since 2018" stays "since 2018", never "(4 years)". "r/o X" means X is SUSPECTED, never that X was ruled out. Never turn a symptom into a diagnosis the input did not state. If the input gives conflicting values for one item, report both with their times. Write "the patient" — never a name or chart number. No bullet points anywhere.`,
-
-admission:`NAME: Admission Note
-Chief Complaint:
-[one line with duration]
-
-Present Illness:
-[prose: "This [age]-year-old [man/woman] with underlying [comorbidities] presented with [course in chronological order]." End: "Under the impression of [dx], the patient was admitted for further evaluation and management."]
-
-Past History:
-1. Systemic disease: [list / "denied"]
-2. Operation: [list / "denied"]
-
-Allergy: [allergies / "NKDA"]
-
-Personal History:
-1. Smoking: [amount / "denied"]
-2. Alcohol: [amount / "denied"]
-3. Betel nut: [use / "denied"]
-
-Physical Examination:
-Vital signs: BP [__] mmHg, HR [__] bpm, RR [__]/min, BT [__]C, SpO2 [__]%
-Chest: [findings / omit]
-Heart: [findings / omit]
-Abdomen: [findings / omit]
-
-Laboratory and Image Findings:
-[abnormal values first with units, then studies with dates / omit]
-
-Impression:
-1. [primary diagnosis]
-2. [secondary / omit]
-
-Plan:
-1. [workup]
-2. [treatment, doses only if stated]
-RULES: Present Illness is prose, not bullets. Write "not recorded" for a missing exam rather than a normal-sounding guess. Impression may contain only diagnoses the input states.`,
-
-procedure:`NAME: Procedure Note
-Procedure Note
-
-Date/Time: [date / "___ (fill in)"]
-Procedure: [name with site/laterality]
-Indication: [one line]
-Operator: [name / "___ (fill in)"]
-Consent: [Written informed consent was obtained from the patient/family prior to the procedure.]
-
-Anesthesia: [agent and dose as stated / "none"]
-Preparation: [position, sterile prep, guidance / omit]
-
-Procedure details:
-[numbered steps; sizes, depths, volumes ONLY if stated]
-
-Findings: [what was found, with amounts / omit]
-Specimens: [what was sent / "none" / omit]
-Complications: [as stated / "No immediate complication was noted."]
-Patient tolerance: [The patient tolerated the procedure well.]
-
-Post-procedure plan:
-1. [monitoring]
-2. [pending studies / omit]
-RULES: never invent sizes, depths, volumes, doses or times — write "___ (fill in)". No teaching commentary.`,
-
-consult:`NAME: Consultation Reply
-Consultation Reply — [specialty]
-
-Thank you for this consultation regarding [age, sex, key context].
-
-Reason for consultation: [the question asked]
-
-Summary:
-[2-5 sentences of the history, findings and results bearing on the question]
-
-Impression:
-1. [assessment]
-
-Recommendations:
-1. [specific action; dose only if stated, else the drug class]
-2. [further items / omit]
-
-Thank you for the consultation. Please feel free to contact us for any further questions.
-RULES: answer the question asked; if the input lacks the answer, state what further study is needed rather than guessing. Never invent doses.`,
-
-progress:`NAME: Progress Note (SOAP)
-S: [subjective report; "no specific complaints" if stable and nothing else given]
-
-O:
-Vital signs: [only values present; omit fields not given]
-[exam findings, one line per system mentioned]
-[new labs with units / omit]
-[new studies / omit]
-
-A: [one line per active problem, numbered if several]
-
-P:
-1. [treatment, doses only as stated]
-2. [planned studies]
-3. [monitoring / disposition]
-RULES: never move subjective into O or objective into S. Omit any O line with no data. Never invent values.`
+/* ------------------------------ template storage ---------------------------------- */
+const TMPL_KEY = 'piTemplate';
+$('customTmpl').value = localStorage.getItem(TMPL_KEY) || '';
+$('customTmpl').oninput = () => localStorage.setItem(TMPL_KEY, $('customTmpl').value);
+$('resetTmplBtn').onclick = () => {
+  $('customTmpl').value = BUILTIN_TEMPLATE;
+  localStorage.setItem(TMPL_KEY, BUILTIN_TEMPLATE);
+  setStatus('Template reset to the built-in text — edit it as you like.');
 };
+const currentTemplate = () => $('customTmpl').value.trim() || BUILTIN_TEMPLATE;
 
-/* ================================ UI wiring ======================================== */
-const CUSTOM_KEY='nanoCustomTemplate';
-(function initTemplates(){
-  const order=['pi','admission','procedure','consult','progress'];
-  $('tmpl').innerHTML = order.map(t=>`<option value="${t}">${t}</option>`).join('')
-                      + `<option value="__custom">custom…</option>`;
-  $('customTmpl').value = localStorage.getItem(CUSTOM_KEY)||'';
-})();
-$('tmpl').onchange=()=>$('customWrap').classList.toggle('hidden',$('tmpl').value!=='__custom');
-$('customTmpl').oninput=()=>localStorage.setItem(CUSTOM_KEY,$('customTmpl').value);
-
-function currentTemplate(){
-  if($('tmpl').value==='__custom'){
-    const t=$('customTmpl').value.trim();
-    if(!t) throw new Error('Custom template is empty — paste one or pick a chart type.');
-    return t;
-  }
-  return TEMPLATES[$('tmpl').value];
-}
-const buildChartPrompt=(tmpl,input)=>`TEMPLATE:\n${tmpl}\n\nPHYSICIAN INPUT:\n${input.trim()}`;
-
-function setProgress(frac){
-  const p=$('prog');
-  if(frac==null){ p.classList.add('hidden'); return; }
-  p.classList.remove('hidden'); p.value=Math.round(frac*100);
-}
-
-async function writeChart(tmpl, sourceText){
-  return runOnce(SYS_CHART, buildChartPrompt(tmpl, sourceText));
-}
-
-async function runRaw(tmpl, rawText){
-  const {cleaned,stats}=cleanRecord(rawText);
-  if(!cleaned) throw new Error('Nothing left after cleaning — is the input empty or all boilerplate?');
-  const t0=performance.now();
-  // ONE session for the whole extraction phase; the budget is measured on it (cached after
-  // the first run) instead of paying for a separate throwaway session.
-  const {timeline,chunkCount,budget} = await runMany(SYS_EXTRACT, async (run, session) => {
-    const budget = await charBudget(SYS_EXTRACT, '', session);
-    const chunks = chunkRecord(cleaned, budget);
-    const parts=[];
-    for(let i=0;i<chunks.length;i++){
-      setStatus(chunks.length>1
-        ? `Extracting ${i+1} of ${chunks.length}…`
-        : 'Reading the record…');
-      setProgress(i/(chunks.length+1));
-      const label=chunks.length>1?`RECORD PART ${i+1} OF ${chunks.length}:\n`:'RAW MEDICAL RECORD:\n';
-      parts.push(parseTimeline(await run(label+chunks[i])));
-    }
-    return {timeline:renderTimeline(mergeTimelines(parts)), chunkCount:chunks.length, budget};
-  });
-  setStatus('Writing the chart from the timeline…');
-  setProgress(chunkCount/(chunkCount+1));
-  const chart=await writeChart(tmpl,timeline);
-  return {chart,timeline,stats,chunks:chunkCount,budget,
-          secs:Math.round((performance.now()-t0)/100)/10};
-}
-
-$('genBtn').onclick=async()=>{
+/* ------------------------------ actions -------------------------------------------- */
+$('genBtn').onclick = async () => {
   showErr('');
-  const input=$('bullets').value.trim();
-  if(!input){ setStatus('Nothing to generate — add text first.'); return; }
-  let tmpl; try{ tmpl=currentTemplate(); }catch(e){ setStatus(e.message); return; }
-  const raw=$('rawMode').checked;
-  $('genBtn').disabled=true; $('chartOut').value=''; setProgress(0);
+  const bullets = $('bullets').value.trim();
+  if(!bullets){ setStatus('Add some bullets first.'); return; }
+  $('genBtn').disabled = true;
+  $('out').value = '';
+  setStatus('Writing on-device…');
+  const t0 = performance.now();
   try{
-    if(raw){
-      const r=await runRaw(tmpl,input);
-      $('chartOut').value=r.chart;
-      $('timelineOut').value=r.timeline;
-      $('tlStats').textContent=`— ${r.chunks} chunk(s), ${r.stats.dropped} noise lines removed, ${r.stats.redacted} identifiers redacted`;
-      $('tlWrap').classList.remove('hidden'); $('tlWrap').open=true;
-      setStatus(`Done in ${r.secs}s. Check the timeline, then proofread the chart.`);
-    }else{
-      setStatus('Generating on-device…');
-      const t0=performance.now();
-      $('chartOut').value=await writeChart(tmpl,input);
-      $('tlWrap').classList.add('hidden');
-      setStatus(`Done in ${Math.round((performance.now()-t0)/100)/10}s. Proofread every line before use.`);
-    }
+    const text = await writePI(currentTemplate(), bullets,
+      pct => setStatus('Downloading the model… ' + Math.round(pct*100) + '%'));
+    $('out').value = text;
+    setStatus(text === 'NO INPUT PROVIDED'
+      ? 'No usable clinical information found in the bullets.'
+      : `Done in ${Math.round((performance.now()-t0)/100)/10}s. Proofread every line.`);
   }catch(e){
     setStatus('Failed.');
-    showErr(String(e.message||e));
-    if(/no on-device model|NO_API|not available/i.test(String(e.message||e))) $('diag').open=true;
-  }finally{ $('genBtn').disabled=false; setProgress(null); }
+    showErr(String(e.message || e));
+    $('diag').open = true;
+  }finally{ $('genBtn').disabled = false; }
 };
 
-$('rewriteBtn').onclick=async()=>{
-  showErr('');
-  let tmpl; try{ tmpl=currentTemplate(); }catch(e){ setStatus(e.message); return; }
-  $('rewriteBtn').disabled=true; setStatus('Rewriting from the edited timeline…');
-  try{ $('chartOut').value=await writeChart(tmpl,$('timelineOut').value); setStatus('Rewritten. Proofread before use.'); }
-  catch(e){ setStatus('Failed.'); showErr(String(e.message||e)); }
-  finally{ $('rewriteBtn').disabled=false; }
-};
-
-$('clearBtn').onclick=()=>{ $('bullets').value=''; $('chartOut').value=''; $('timelineOut').value='';
-  $('tlWrap').classList.add('hidden'); showErr(''); setStatus('Ready.'); };
-$('copyBtn').onclick=async()=>{
-  try{ await navigator.clipboard.writeText($('chartOut').value); setStatus('Copied to clipboard.'); }
+$('clearBtn').onclick = () => { $('bullets').value=''; $('out').value=''; showErr(''); setStatus('Ready.'); };
+$('copyBtn').onclick = async () => {
+  try{ await navigator.clipboard.writeText($('out').value); setStatus('Copied.'); }
   catch(e){ setStatus('Copy failed — select the text and copy manually.'); }
 };
 
-$('testBtn').onclick=async()=>{
-  $('diagOut').textContent='Running…';
-  const r=await probeCapabilities();
-  const lines=[
-    `Prompt API:      ${r.api||'NOT FOUND'}`,
-    `Availability:    ${r.availability||'—'}`,
-    `Context window:  ${r.contextWindow??'—'} tokens`,
-    `Echo stub:       ${r.stub===null?'—':(r.stub?'YES — no real model, output would be your own input':'no')}`,
-    `Sample reply:    ${r.sample||'—'}`,
-    r.error?`Error:           ${r.error}`:''
-  ].filter(Boolean);
-  if(r.stub) lines.push('', 'This browser cannot generate charts. Use Chrome (not Chromium) with the flags below.');
-  $('diagOut').textContent=lines.join('\n');
+$('testBtn').onclick = async () => {
+  $('diagOut').textContent = 'Running…';
+  const r = { api:null, availability:null, contextWindow:null, stub:null, sample:null, error:null };
+  try{
+    r.api = self.LanguageModel ? 'LanguageModel'
+          : (self.ai && (self.ai.languageModel||self.ai.assistant)) ? 'window.ai'
+          : (self.ai && self.ai.createTextSession) ? 'legacy window.ai' : null;
+    if(!r.api){ r.error = 'No Prompt API in this browser.'; }
+    else {
+      r.availability = await getAvailability();
+      if(r.availability === 'available'){
+        const { session } = await createSession('Reply with the single word: ok');
+        r.contextWindow = session.contextWindow ?? session.inputQuota ?? 'not reported';
+        const probe = 'Reply with the single word: ok';
+        let out = '';
+        try{ out = await session.prompt(probe); }catch(e){ r.error = String(e); }
+        r.stub = detectStub(probe, out);
+        r.sample = String(out).slice(0, 80);
+        try{ session.destroy(); }catch(e){}
+      }
+    }
+  }catch(e){ r.error = String(e); }
+  $('diagOut').textContent = [
+    `Prompt API:      ${r.api || 'NOT FOUND'}`,
+    `Availability:    ${r.availability || '—'}`,
+    `Context window:  ${r.contextWindow ?? '—'}`,
+    `Echo stub:       ${r.stub===null ? '—' : (r.stub ? 'YES — no real model' : 'no')}`,
+    `Sample reply:    ${r.sample || '—'}`,
+    r.error ? `Error:           ${r.error}` : ''
+  ].filter(Boolean).join('\n');
 };
 
-(async()=>{
-  const a=await getAvailability();
-  if(a==='available'){ setStatus('On-device model ready.'); $('genBtn').disabled=false; }
-  else if(a==='downloadable'||a==='downloading'){
-    setStatus('Model will download on your first Generate (~2 GB, one time).'); $('genBtn').disabled=false; }
-  else { setStatus('No on-device model in this browser — open “Model & setup check”.');
-    $('diag').open=true; $('genBtn').disabled=false; }
+(async () => {
+  const a = await getAvailability();
+  $('genBtn').disabled = false;
+  if(a === 'available') setStatus('Ready.');
+  else if(a === 'downloadable' || a === 'downloading')
+    setStatus('Ready — the model downloads on your first run (~2 GB, one time).');
+  else { setStatus('No on-device model in this browser — see “Model & setup check”.'); $('diag').open = true; }
 })();
+
+/* exposed for console testing without the UI */
+window.PI = { detectStub, getAvailability, createSession, writePI, BUILTIN_TEMPLATE, SYSTEM_PROMPT };
 </script>
 </body>
 </html>
