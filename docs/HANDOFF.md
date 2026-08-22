@@ -73,10 +73,16 @@ Not done / broken:
   `on-device-internals` says "device performance class: error". The optimization-guide flag that
   older guides mention **does not exist in Chrome 151**. Untried: the relaunch, and
   `#on-device-model-litert-lm-backend` (LiteRT-LM runs on CPU, which may suit a GPU-less VDI).
-Next session should: (1) ask whether the VDI relaunch made the model appear; (2) get ONE real
-Present Illness out of the page on a working Chrome and paste it into this log, judging whether
-Nano keeps the template, keeps every value, and avoids the five hallucination classes. Do not add
-features to the page — the user asked for it small.
+**UPDATE (same day): the user has GIVEN UP on the VDI.** Do not reopen it. The tool lives on
+the MacBook, where Nano works. Treat "make it run at the hospital" as closed unless the user
+raises it again.
+
+Next session should: get ONE real Present Illness out of the page on the user's Mac and paste it
+into this log — does Nano keep the template, keep every value, and avoid the five hallucination
+classes? That single measurement is the only thing still unknown about this tool. If Nano's prose
+disappoints, the fallback is not more Nano tuning: the Ollama pipeline on the same Mac is already
+built, eval-covered, and uses a 7B model (`python3 app/server.py`, `--type pi`).
+Do not add features to the page — the user asked for it small.
 
 ## 2026-08-06 (late) — Claude (Opus 5) — VDI blocker found: the Nano path cannot serve the real workflow
 **This entry outranks the two below it. Read it before planning any work.**
