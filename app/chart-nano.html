@@ -73,7 +73,7 @@ admitted for further management"></textarea>
       <button id="clearBtn" class="secondary" type="button">Clear</button>
     </div>
     <details id="tmplWrap">
-      <summary>Template <span class="muted">— edit the wording rules</span></summary>
+      <summary>Template <span class="muted" id="tmplNote">— edit the wording rules</span></summary>
       <p class="muted" style="margin:8px 0">Saved in this browser only. Leave it empty to use the
         built-in one. Press “Reset” to bring the built-in text back and edit from there.</p>
       <textarea id="customTmpl" placeholder="(empty = use the built-in template)"></textarea>
@@ -128,12 +128,15 @@ const showErr = m => { const b=$('errBox');
 /* Every rule below was added because a real model made that exact mistake during
    testing. Keep them when editing: they are the difference between a draft you can
    trust and one you must fact-check line by line. */
-const BUILTIN_TEMPLATE = `Write ONLY the Present Illness narrative in English prose, ready to paste into the Present Illness field. No headings, no "Present Illness:" label, no chief complaint, no past history list, no impression, no plan. Begin with the word "This".
+const BUILTIN_TEMPLATE = `Write ONLY the Present Illness narrative in English prose, ready to paste into the Present Illness field. No headings, no "Present Illness:" label, no chief complaint, no impression, no plan. Past history and social history belong inside the opening sentences as prose — never as a separate section, heading or numbered list. Begin with the word "This".
 
-OPENING SENTENCE:
-"This [age]-year-old [man/woman] with underlying [EVERY chronic disease in the bullets, most relevant first, keeping the year exactly as written] presented with [first symptom and its duration]."
-Search all of the bullets for chronic diseases before writing — missing one is the most common error. If none are given, write "no known systemic disease".
-If the age is not given, write "This patient" and never a number. If the sex is not given, do not write "man" or "woman". Never guess either.
+OPENING — past history and social history ALWAYS come first, before anything about the current illness. Write them in this order:
+1. PAST HISTORY, in the first sentence: "This [age]-year-old [man/woman] with underlying [EVERY chronic disease in the bullets, most relevant first, keeping the year exactly as written; include previous operations as "s/p [operation] in [year]"]".
+   Search all of the bullets for chronic diseases and past operations before writing — missing one is the most common error. If none are given, write "no known systemic disease".
+   If the age is not given, write "This patient" and never a number. If the sex is not given, do not write "man" or "woman". Never guess either.
+2. SOCIAL HISTORY, immediately after, in its own sentence: smoking (amount and duration), alcohol, and betel nut, using ONLY what the bullets state — for example "He has smoked one pack per day for 30 years and denies alcohol and betel nut use."
+   If the bullets say nothing about smoking, alcohol or betel nut, write NOTHING about them. Never write "denies smoking" or "no alcohol" unless the bullets actually say so.
+3. Only after both of those, begin the current illness ("He presented with [first symptom and its duration]...").
 
 BODY, in chronological order:
 - how each symptom began and changed: onset, character, severity, timing, what made it better or worse
@@ -143,9 +146,12 @@ BODY, in chronological order:
 - treatment already given and the response to it
 Include EVERY value in the bullets, including ones that look unrelated to the main complaint. Never gather values into a list, and never write "Laboratory results included:" or any similar collecting phrase.
 
-CLOSING:
-Only if the bullets state what actually happened, end with: "Under the impression of [diagnosis], the patient was [admitted / referred] for further evaluation and management."
-If the bullets state no such outcome, write no closing sentence — simply end at the last fact given. Never invent an admission or referral to round the story off.
+CLOSING — choose exactly ONE of these three:
+(a) SCHEDULED OR ELECTIVE OPERATION. If the bullets say the patient is being admitted for a planned/scheduled/elective operation, end with this wording, word for word:
+"[Diagnosis] was impressed. After informing the indications and risks of [operation], the patient decided to receive the operation. Hence, the patient was admitted for scheduled [operation]."
+Put the bullets' own diagnosis in [Diagnosis] and the bullets' own operation name in [operation], writing the operation name identically in both places. Do not reword, shorten or embellish these three sentences.
+(b) ANY OTHER STATED OUTCOME: "Under the impression of [diagnosis], the patient was [admitted / referred] for further evaluation and management."
+(c) NOTHING STATED: write no closing sentence at all — simply end at the last fact given. Never invent an admission, a referral or an operation to round the story off.
 
 RULES:
 - Never invent a value, date, dose, finding, age, sex, diagnosis or outcome. Every clinical fact must come from the bullets.
@@ -220,12 +226,26 @@ async function writePI(template, bullets, onPct){
 /* ------------------------------ template storage ---------------------------------- */
 const TMPL_KEY = 'piTemplate';
 $('customTmpl').value = localStorage.getItem(TMPL_KEY) || '';
-$('customTmpl').oninput = () => localStorage.setItem(TMPL_KEY, $('customTmpl').value);
+$('customTmpl').oninput = () => { localStorage.setItem(TMPL_KEY, $('customTmpl').value); markTemplate(); };
+
+/* A template saved in this browser silently overrides the built-in one, so a copy saved
+   before the built-in text changed would quietly keep using the OLD wording rules. Say so
+   in the summary rather than letting it pass unnoticed. */
+function markTemplate(){
+  const saved = $('customTmpl').value.trim();
+  const stale = saved && saved !== BUILTIN_TEMPLATE;
+  $('tmplNote').textContent = stale
+    ? '— your own version is in use (press Reset to take the updated built-in rules)'
+    : '— edit the wording rules';
+  $('tmplNote').style.color = stale ? '#8a5a00' : '';
+}
 $('resetTmplBtn').onclick = () => {
   $('customTmpl').value = BUILTIN_TEMPLATE;
   localStorage.setItem(TMPL_KEY, BUILTIN_TEMPLATE);
+  markTemplate();
   setStatus('Template reset to the built-in text — edit it as you like.');
 };
+markTemplate();
 const currentTemplate = () => $('customTmpl').value.trim() || BUILTIN_TEMPLATE;
 
 /* ------------------------------ actions -------------------------------------------- */

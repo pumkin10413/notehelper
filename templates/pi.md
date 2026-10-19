@@ -1,8 +1,21 @@
 NAME: Present Illness only
 STYLE: A single Present Illness narrative in English, Taiwan teaching-hospital convention, suitable for pasting directly into an admission note. Third person, past tense for history and present tense only for currently ongoing states. Standard abbreviations acceptable (DM, HTN, CKD, CAD, s/p, r/o). Formal clinical prose in paragraphs — never bullets. This template outputs the Present Illness paragraph(s) and NOTHING else: no headings, no "Chief Complaint", no "Impression", no "Plan".
 ---
-[OPENING SENTENCE:
-"This [age]-year-old [man/woman] with underlying [ALL chronic/underlying diagnoses from the input, most clinically relevant first, each with duration or year of diagnosis when the input gives one; if the input states none, write "no known systemic disease"] [has been followed up at our outpatient department for [condition] / was relatively well] until [onset time], when [first symptom] developed."
+[OPENING — PAST HISTORY AND SOCIAL HISTORY ALWAYS COME FIRST, before anything about the
+current illness, in this order:
+
+1. PAST HISTORY, in the first sentence:
+"This [age]-year-old [man/woman] with underlying [ALL chronic/underlying diagnoses from the input, most clinically relevant first, each with duration or year of diagnosis when the input gives one; include previous operations as "s/p [operation] in [year]"; if the input states none, write "no known systemic disease"]"
+Search the WHOLE input for chronic diagnoses and past operations before writing — they hide in
+past-history sections, problem lists and old notes, and missing one is the most common failure.
+
+2. SOCIAL HISTORY, immediately after, in its own sentence: smoking (amount and duration),
+alcohol, and betel nut, using ONLY what the input states — e.g. "He has smoked one pack per day
+for 30 years and denies alcohol and betel nut use."
+If the input says nothing about smoking, alcohol or betel nut, write NOTHING about them. Never
+write "denies smoking" or "no alcohol use" unless the input actually says so.
+
+3. ONLY THEN the current illness: "[has been followed up at our outpatient department for [condition] / was relatively well] until [onset time], when [first symptom] developed."
 
 AGE AND SEX ARE NOT OPTIONAL TO GUESS. If the input does not state the age, or states "age not
 stated", write "This patient" and never a number. If the input does not state the sex, do not
@@ -18,14 +31,21 @@ Correct output when both are absent: "This patient with underlying ...".]
 - treatments already given and the response to them
 - compliance, self-medication, or traditional/herbal medicine use if the input mentions it]
 
-[CLOSING — CONDITIONAL, read carefully:
-- If (and ONLY if) the input explicitly states a disposition, write one closing sentence using
-  the input's own wording: "Therefore, the patient [exact disposition from the input] for
-  further evaluation and management."
-- If the input states no disposition, or states only continued outpatient follow-up, then write
-  NO closing sentence at all. End the narrative with the most recent clinical event and stop.
-  Do NOT manufacture an admission, an emergency department visit, or a referral to create a
-  tidy ending.]
+[CLOSING — CONDITIONAL, choose exactly ONE, read carefully:
+
+(a) SCHEDULED OR ELECTIVE OPERATION. If the input says the patient is being admitted for a
+planned/scheduled/elective operation, end with this wording, word for word:
+"[Diagnosis] was impressed. After informing the indications and risks of [operation], the patient decided to receive the operation. Hence, the patient was admitted for scheduled [operation]."
+Put the input's own diagnosis in [Diagnosis] and the input's own operation name in [operation],
+writing the operation name identically in both places. Do not reword, shorten or embellish
+these three sentences.
+
+(b) ANY OTHER EXPLICITLY STATED DISPOSITION: one sentence in the input's own wording:
+"Therefore, the patient [exact disposition from the input] for further evaluation and management."
+
+(c) NO DISPOSITION STATED, or only continued outpatient follow-up: write NO closing sentence at
+all. End the narrative with the most recent clinical event and stop. Do NOT manufacture an
+admission, an emergency department visit, a referral or an operation to create a tidy ending.]
 ---
 RULES:
 - Never state an age or sex the input does not contain. Inventing "This 54-year-old man" for a record that never gave an age or sex puts fabricated demographics into a medical record; write "This patient" instead.
